@@ -58,8 +58,12 @@ body {
 
 /* 极简的"键盘按键"标签 */
 .kbd {
-  display: inline-block;
-  padding: 1px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
   border: 1px solid color-mix(in srgb, var(--fg) 30%, transparent);
   border-radius: 4px;
   font-family: var(--font-mono);
@@ -67,6 +71,7 @@ body {
   line-height: 1;
   color: color-mix(in srgb, var(--fg) 80%, transparent);
   background: color-mix(in srgb, var(--fg) 4%, transparent);
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes blink {
