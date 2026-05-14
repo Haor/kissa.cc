@@ -318,8 +318,12 @@ export function SceneStage() {
     const QUALITY = 1.0;
     const resize = () => {
       const dpr = Math.min(QUALITY, window.devicePixelRatio || 1);
-      let w = Math.max(1, Math.round(canvas.clientWidth * dpr));
-      let h = Math.max(1, Math.round(canvas.clientHeight * dpr));
+      // 优先用 viewport 尺寸；canvas.clientWidth 在 mount 那一帧可能还是 0
+      // （父级 absolute inset-0 layout 还没 flush），用 window.inner* 兜底
+      const clientW = canvas.clientWidth || window.innerWidth || 1;
+      const clientH = canvas.clientHeight || window.innerHeight || 1;
+      let w = Math.max(1, Math.round(clientW * dpr));
+      let h = Math.max(1, Math.round(clientH * dpr));
       const pixels = w * h;
       if (pixels > MAX_PIXELS) {
         const s = Math.sqrt(MAX_PIXELS / pixels);
@@ -336,6 +340,11 @@ export function SceneStage() {
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
     resize();
+    // 兜底：连续在下 4 帧再 resize 一次，防止首屏 layout 未稳时拿到错误尺寸
+    requestAnimationFrame(resize);
+    requestAnimationFrame(() => requestAnimationFrame(resize));
+    // window resize / orientation 也兜底监听一次（ResizeObserver 应该够，但保险）
+    window.addEventListener("resize", resize, { passive: true });
 
     // ===== RAF =====
     const fpsCap = 60;
@@ -347,15 +356,25 @@ export function SceneStage() {
     };
     document.addEventListener("visibilitychange", onVis);
 
-    const start = performance.now();
+    // 给 drift / starfield 等慢 effect 一个"已经流动"的初始相位，避免首屏
+    // 看到 fbm 在 t=0 时较稀疏的初始图样 → 切回别屏才看到"满"的样子。
+    const start = performance.now() - 8000;
     let raf = 0;
     let lastDisplaySlideId: string | null = null;
+    let warmupFrames = 6;
 
     const draw = (now: number) => {
       raf = requestAnimationFrame(draw);
       if (pageHidden) return;
       if (now - lastFrame < frameInterval) return;
       lastFrame = now;
+
+      // 头几帧强制再 resize 一次：mount 那一瞬 layout 可能还没 flush，
+      // canvas.clientWidth 可能是 0，第一次 resize 拿到的尺寸不对。
+      if (warmupFrames > 0) {
+        resize();
+        warmupFrames -= 1;
+      }
 
       // 直接从 zustand store 读最新 transition 状态（每帧最新，不重建 effect）
       const s = useCarousel.getState();
@@ -420,6 +439,7 @@ export function SceneStage() {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseout", onLeave);
+      window.removeEventListener("resize", resize);
       gl.deleteProgram(prog);
       gl.deleteBuffer(buf);
       for (const at of atlases.values()) gl.deleteTexture(at.tex);
