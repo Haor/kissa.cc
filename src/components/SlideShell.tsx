@@ -129,10 +129,9 @@ function CoverContent({ slide }: { slide: Slide }) {
           {slide.sentence}
         </div>
         <div className="mt-4 text-sm opacity-80">
-          {profile.aka}{" "}
-          <span className="opacity-55">·</span>{" "}
-          <span className="opacity-70">{profile.title}</span>
+          {profile.name} <span className="opacity-55">·</span> {profile.aka}
         </div>
+        <div className="mt-1 text-xs opacity-60">{profile.title}</div>
         <div className="mt-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] opacity-70">
           <span className="kbd">→</span>
           <span>slide</span>
