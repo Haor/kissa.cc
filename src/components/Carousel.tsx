@@ -44,9 +44,12 @@ export function Carousel() {
     width: number;
     pointerId: number | null;
   }>({ active: false, startX: 0, deltaX: 0, width: 0, pointerId: null });
-  const wheelRef = useRef<{ accum: number; lastEvent: number; locked: boolean }>(
-    { accum: 0, lastEvent: 0, locked: false },
-  );
+  const wheelRef = useRef<{
+    accum: number;
+    lastEvent: number;
+    /** busy 期间或刚翻完页后处于 "等用户重新发起手势" 状态 */
+    armed: boolean;
+  }>({ accum: 0, lastEvent: 0, armed: true });
 
   const index = useCarousel((s) => s.index);
   const direction = useCarousel((s) => s.direction);
@@ -89,26 +92,61 @@ export function Carousel() {
 
   // -------- 输入：wheel ----------
   useEffect(() => {
+    // Mac 触控板的惯性滚动（momentum）会在用户停手后持续 ~300-700ms 每帧
+    // 发一个 wheel event。早期实现用 "lastEvent 距离 > 250ms 才解锁"，但惯性
+    // 期间间隔永远 < 250ms，所以锁会一直挂着，必须移动光标打断惯性才能再翻。
+    //
+    // 新策略：
+    //   1. 翻页后 wheelRef.armed = false（缴械），并把 accum 清零
+    //   2. 等用户出现一次"明显静默" → 重新装弹 (armed = true)
+    //   3. 静默判定 = 至少 ~120ms 没收到 wheel event，比惯性的事件间隔大、
+    //      比正常用户两次手势的间隔小
+    //   4. 此外 store.busy 期间一律 accum=0 + 不响应（避免转场中累积）
+    const SILENCE_MS = 120;
+    let silenceTimer: number | null = null;
+    const armAfterSilence = () => {
+      if (silenceTimer !== null) window.clearTimeout(silenceTimer);
+      silenceTimer = window.setTimeout(() => {
+        wheelRef.current.armed = true;
+        wheelRef.current.accum = 0;
+        silenceTimer = null;
+      }, SILENCE_MS);
+    };
+
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
       const now = performance.now();
-      if (now - wheelRef.current.lastEvent > 250) {
-        wheelRef.current.accum = 0;
-        wheelRef.current.locked = false;
-      }
       wheelRef.current.lastEvent = now;
-      if (wheelRef.current.locked) return;
+
+      // 转场期间：所有 wheel 都被吞掉（无论是用户主动还是惯性），且不累计
+      if (useCarousel.getState().busy) {
+        wheelRef.current.accum = 0;
+        wheelRef.current.armed = false;
+        armAfterSilence();
+        return;
+      }
+
+      // 缴械状态：等惯性散尽
+      if (!wheelRef.current.armed) {
+        armAfterSilence();
+        return;
+      }
+
       wheelRef.current.accum += dx;
       if (Math.abs(wheelRef.current.accum) >= WHEEL_THRESHOLD) {
         const dir = wheelRef.current.accum > 0 ? 1 : -1;
-        wheelRef.current.locked = true;
         wheelRef.current.accum = 0;
+        wheelRef.current.armed = false;
+        armAfterSilence();
         goto(dir);
       }
     };
     window.addEventListener("wheel", onWheel, { passive: false });
-    return () => window.removeEventListener("wheel", onWheel);
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      if (silenceTimer !== null) window.clearTimeout(silenceTimer);
+    };
   }, [goto]);
 
   // -------- 输入：键盘 ----------

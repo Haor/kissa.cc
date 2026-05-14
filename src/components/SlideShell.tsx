@@ -272,11 +272,11 @@ function LinksContent({ slide }: { slide: Slide }) {
                   <div className="text-[10px] uppercase tracking-[0.4em] opacity-55">
                     {g.label}
                   </div>
-                  <ul className="mt-3 space-y-1.5">
+                  <ul className="mt-3 space-y-2">
                     {items.map((it, i) => {
                       const isPlaceholder = it.href === "#";
                       return (
-                        <li key={`${it.label}-${i}`}>
+                        <li key={`${it.label}-${i}`} className="leading-tight">
                           <a
                             href={it.href}
                             target={
@@ -288,19 +288,19 @@ function LinksContent({ slide }: { slide: Slide }) {
                                 : undefined
                             }
                             aria-disabled={isPlaceholder || undefined}
-                            className={`text-sm transition-opacity ${
+                            className={`block whitespace-nowrap text-sm transition-opacity ${
                               isPlaceholder
                                 ? "opacity-35"
                                 : "opacity-85 hover:opacity-100"
                             }`}
                           >
                             {it.label}
-                            {it.note && (
-                              <span className="ml-2 text-[10px] opacity-55">
-                                {it.note}
-                              </span>
-                            )}
                           </a>
+                          {it.note && (
+                            <div className="mt-0.5 whitespace-nowrap text-[10px] opacity-55">
+                              {it.note}
+                            </div>
+                          )}
                         </li>
                       );
                     })}

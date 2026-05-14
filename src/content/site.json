@@ -108,7 +108,13 @@
             "note": "reverse proxy"
           }
         ],
-        "friends": [{ "label": "TBD", "href": "#" }]
+        "friends": [
+          {
+            "label": "MC Localizer",
+            "href": "https://mc-localizer.triturbo.dev/",
+            "note": "by triturbo"
+          }
+        ]
       }
     },
 
