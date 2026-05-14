@@ -168,11 +168,23 @@ export function SceneStage() {
     gl.uniform1i(U.atlas, 0);
     gl.uniform1i(U.mask, 1);
     gl.uniform1f(U.quality, 1.0);
+    // 显式初始化所有可能"漏设"的标量 uniform，避免 GPU/驱动给的不确定默认值。
+    // 之前首次进 cover (无 mask) 时 useMask 未被显式置 0，部分驱动留 1，
+    // 导致首屏出现品牌 mask 形状（中空），切到其它屏再回来就好——因为那时
+    // mask 分支被覆盖到了。
+    gl.uniform1f(U.useMask, 0);
+    gl.uniform1f(U.mouseActive, 0);
+    gl.uniform1f(U.mouseIntensity, 0);
+    gl.uniform2f(U.mouse, 0.5, 0.5);
+    gl.uniform2f(U.mouseVel, 0, 0);
+    gl.uniform1f(U.transition, 0);
 
     // 切 slide 时只更新这些 uniform + 切 atlas/mask 纹理绑定
     let currentEffect = -1;
     let currentMaskId: MaskId | null | undefined = undefined;
     let currentMaskSrc: HTMLCanvasElement | null = null;
+    // 首次 applySlide 强制走 mask 分支，确保 useMask uniform 被覆盖一次。
+    let firstApply = true;
 
     const uploadMask = (src: HTMLCanvasElement) => {
       gl.activeTexture(gl.TEXTURE1);
@@ -222,7 +234,11 @@ export function SceneStage() {
 
       const newId = slide.maskId;
       const desiredSrc = newId ? masksRef.current[newId] ?? null : null;
-      if (newId !== currentMaskId || desiredSrc !== currentMaskSrc) {
+      if (
+        firstApply ||
+        newId !== currentMaskId ||
+        desiredSrc !== currentMaskSrc
+      ) {
         currentMaskId = newId;
         if (desiredSrc) {
           uploadMask(desiredSrc);
@@ -231,6 +247,7 @@ export function SceneStage() {
           gl.uniform1f(U.useMask, 0);
         }
         currentMaskSrc = desiredSrc;
+        firstApply = false;
       }
     };
 
