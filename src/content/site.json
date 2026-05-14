@@ -13,13 +13,13 @@
 
   "slides": {
     "cover": {
-      "kicker": "kissa — index 00",
+      "kicker": "an index of selves · 00",
       "sentence": "as i dreamed."
     },
 
     "about": {
       "sentence": "Engineer · Daydreamer",
-      "intent": "based in Shenzhen — building things that mostly only I care about.",
+      "intent": "based in Shenzhen — drifting between the physical and the virtual, building little worlds mostly only I care about.",
       "cta": { "label": "Email me →", "href": "mailto:i@haor.cc" }
     },
 
@@ -40,7 +40,7 @@
 
     "github": {
       "handle": "@Haor",
-      "intent": "commits speak louder.",
+      "intent": "rarely committed.",
       "cta": { "label": "Open GitHub →", "href": "https://github.com/Haor" }
     },
 
@@ -75,7 +75,7 @@
       "sentence": "the web of mine.",
       "links": {
         "projects": [
-          { "label": "Nexus", "href": "https://nexus.114514.pro/", "note": "personal hub" }
+          { "label": "Nexus", "href": "https://nexus.114514.pro/", "note": "VRC friends feed" }
         ],
         "tools": [{ "label": "TBD", "href": "#" }],
         "friends": [{ "label": "TBD", "href": "#" }]

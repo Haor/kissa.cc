@@ -493,10 +493,12 @@ void main() {
   }
 
   // 阅读带亮度衰减
-  float readBand = smoothstep(0.42, 0.05, v_uv.y);
-  float readAtten = mix(1.0, 0.32, readBand);
+  // 范围扩大到 0.48（之前 0.42），最暗压到 0.24（之前 0.32），让 hardware
+  // 这种纵向列表型内容下方有更安静的暗场可压字。
+  float readBand = smoothstep(0.48, 0.04, v_uv.y);
+  float readAtten = mix(1.0, 0.24, readBand);
   finalRgb *= readAtten;
-  a *= mix(1.0, 0.55, readBand);
+  a *= mix(1.0, 0.45, readBand);
 
   // 散开期间整体 alpha 衰减
   a *= 1.0 - tAbs;

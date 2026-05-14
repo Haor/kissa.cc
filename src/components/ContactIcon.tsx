@@ -30,11 +30,22 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   vrchat: (
-    // 简化 VR headset 轮廓：横置胶囊 + 双目护盖 + 顶部头带挂点
+    // VRChat 官方风格 speech bubble + "VR" 字样
     <>
-      <rect x="1.6" y="5.4" width="14.8" height="7.6" rx="2.4" />
-      <path d="M5 8.4l1.4 2.4M11 8.4l-1.4 2.4M8.5 7.6v3.2" />
-      <path d="M6 5.2l0.6-1.4h4.8l0.6 1.4" />
+      <path d="M3.4 2.4h11.2c1.1 0 2 0.9 2 2v6.8c0 1.1-0.9 2-2 2H10l-2.6 2.8c-0.4 0.4-1.1 0.1-1.1-0.5v-2.3H3.4c-1.1 0-2-0.9-2-2V4.4c0-1.1 0.9-2 2-2z" />
+      <text
+        x="9"
+        y="8.9"
+        fontSize="6.2"
+        fontWeight={700}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="currentColor"
+        stroke="none"
+        fontFamily="ui-monospace, monospace"
+      >
+        VR
+      </text>
     </>
   ),
   back: (

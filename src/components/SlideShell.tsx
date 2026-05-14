@@ -52,9 +52,14 @@ export function SlideShell({ slide, index, total }: Props) {
       {/* 底部 overlay 柔化：shader 端已经接管"阅读带"亮度衰减，CSS 这里只做
        *  最后一点点贴底色加深，保证 chrome 文字与底部装饰仍然可读。 */}
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-40"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-[5]"
         style={{
-          background: `linear-gradient(to top, ${theme.bg}f2 0%, ${theme.bg}80 50%, transparent 100%)`,
+          // 含密集列表的屏（hardware / links）给更高更深的渐变；其它屏保持原 h-40 高度
+          height: slide.id === "hardware" || slide.id === "links" ? "60%" : "10rem",
+          background:
+            slide.id === "hardware" || slide.id === "links"
+              ? `linear-gradient(to top, ${theme.bg}f8 0%, ${theme.bg}cc 35%, ${theme.bg}66 65%, transparent 100%)`
+              : `linear-gradient(to top, ${theme.bg}f2 0%, ${theme.bg}80 50%, transparent 100%)`,
         }}
       />
 
@@ -124,9 +129,10 @@ function CoverContent({ slide }: { slide: Slide }) {
           {slide.sentence}
         </div>
         <div className="mt-4 text-sm opacity-80">
-          {profile.name} <span className="opacity-55">·</span> {profile.aka}
+          {profile.aka}{" "}
+          <span className="opacity-55">·</span>{" "}
+          <span className="opacity-70">{profile.title}</span>
         </div>
-        <div className="mt-1 text-xs opacity-60">{profile.title}</div>
         <div className="mt-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] opacity-70">
           <span className="kbd">→</span>
           <span>slide</span>
