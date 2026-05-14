@@ -166,8 +166,9 @@ export function Carousel() {
       } else if (e.key === "End") {
         e.preventDefault();
         gotoIndex(SLIDES.length - 1);
-      } else if (/^[1-9]$/.test(e.key)) {
-        const n = parseInt(e.key, 10) - 1;
+      } else if (/^[0-9]$/.test(e.key)) {
+        // 0 → index 0 (cover), ..., 9 → index 9 (contact)。直接 1:1 映射
+        const n = parseInt(e.key, 10);
         if (n < SLIDES.length) {
           e.preventDefault();
           gotoIndex(n);

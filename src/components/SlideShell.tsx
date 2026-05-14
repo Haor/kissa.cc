@@ -136,7 +136,7 @@ function CoverContent({ slide }: { slide: Slide }) {
           <span className="kbd">→</span>
           <span>slide</span>
           <span className="opacity-45">·</span>
-          <span className="kbd">1</span>
+          <span className="kbd">0</span>
           <span className="opacity-45">..</span>
           <span className="kbd">9</span>
           <span>jump</span>
