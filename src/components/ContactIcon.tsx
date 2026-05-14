@@ -5,7 +5,7 @@
  * 不使用图标库，4 个内联 path 即可。
  */
 
-type IconName = "mail" | "discord" | "telegram" | "back";
+type IconName = "mail" | "discord" | "telegram" | "vrchat" | "back" | "copy";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   mail: (
@@ -29,10 +29,24 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M5 10.7l7-5.4-5.5 6" />
     </>
   ),
+  vrchat: (
+    // 简化 VR headset 轮廓：横置胶囊 + 双目护盖 + 顶部头带挂点
+    <>
+      <rect x="1.6" y="5.4" width="14.8" height="7.6" rx="2.4" />
+      <path d="M5 8.4l1.4 2.4M11 8.4l-1.4 2.4M8.5 7.6v3.2" />
+      <path d="M6 5.2l0.6-1.4h4.8l0.6 1.4" />
+    </>
+  ),
   back: (
     <>
       <path d="M14 9a5 5 0 1 1-1.5-3.5" />
       <path d="M14 3v3h-3" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="5.6" y="5.6" width="8.4" height="9.4" rx="1.2" />
+      <path d="M3.2 11.4V4.6c0-0.7 0.6-1.4 1.4-1.4h6.8" />
     </>
   ),
 };

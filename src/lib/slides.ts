@@ -31,14 +31,21 @@ export type Slide = {
   maskId?: "x" | "instagram" | "github" | "huggingface" | "steam";
   /** 居中主文（cover/about/hardware/links/contact 用） */
   sentence?: string;
+  /** cover 顶部小字（"kicker" 标题） */
+  kicker?: string;
   /** 平台 handle / 邮箱 */
   handle?: string;
   /** 一句"在那儿干什么" */
   intent?: string;
   /** 主 CTA */
   cta?: { label: string; href: string };
-  /** contact 屏的多组联系方式 */
-  contacts?: { label: string; value: string; href: string }[];
+  /** contact 屏的多组联系方式。action: "copy" 时点击复制 href 内容 */
+  contacts?: {
+    label: string;
+    value: string;
+    href: string;
+    action?: "copy";
+  }[];
   /** hardware 屏的硬件清单 */
   hardware?: { group: string; value: string }[];
   /** links 屏的外链分组 */
@@ -147,9 +154,9 @@ const SLIDE_VISUALS: SlideVisual[] = [
     label: "Links",
     theme: "links",
     effect: 10,
-    cellSize: 10,
-    speed: 0.35,
-    cursorIntensity: 0.5,
+    cellSize: 9,
+    speed: 0.55,
+    cursorIntensity: 0.7,
   },
   {
     id: "contact",
@@ -167,6 +174,7 @@ type SlideCopy = Partial<
   Pick<
     Slide,
     | "sentence"
+    | "kicker"
     | "handle"
     | "intent"
     | "cta"

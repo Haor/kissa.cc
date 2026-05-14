@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Slide } from "@/lib/slides";
 import { profile } from "@/lib/data";
 import { THEMES } from "@/lib/theme";
@@ -9,6 +10,7 @@ const CONTACT_ICON_MAP: Record<string, IconName> = {
   email: "mail",
   discord: "discord",
   telegram: "telegram",
+  vrchat: "vrchat",
   back: "back",
 };
 
@@ -110,8 +112,13 @@ function CoverContent({ slide }: { slide: Slide }) {
   return (
     <div className="text-soft-shadow pointer-events-none relative z-10 flex h-full w-full flex-col font-mono">
       <div className="mt-auto px-8 pb-28 pl-10">
-        <div className="text-[10px] uppercase tracking-[0.5em] opacity-60">
-          a personal homepage
+        <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.5em] opacity-60">
+          <span
+            className="inline-block h-px w-8"
+            style={{ background: "currentColor" }}
+            aria-hidden="true"
+          />
+          <span>{slide.kicker ?? `${profile.name.toLowerCase()} · index`}</span>
         </div>
         <div className="mt-3 text-[2.4rem] font-medium leading-[1.05] tracking-tight md:text-[3.4rem]">
           {slide.sentence}
@@ -119,9 +126,7 @@ function CoverContent({ slide }: { slide: Slide }) {
         <div className="mt-4 text-sm opacity-80">
           {profile.name} <span className="opacity-55">·</span> {profile.aka}
         </div>
-        <div className="mt-1 text-xs opacity-60">
-          {profile.title} <span className="opacity-55">·</span> {profile.location}
-        </div>
+        <div className="mt-1 text-xs opacity-60">{profile.title}</div>
         <div className="mt-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] opacity-70">
           <span className="kbd">→</span>
           <span>slide</span>
@@ -323,42 +328,98 @@ function ContactContent({ slide }: { slide: Slide }) {
         </p>
         {slide.contacts && (
           <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-7 gap-y-3 text-sm">
-            {slide.contacts.map((c) => {
-              const icon = CONTACT_ICON_MAP[c.label];
-              return (
-                <li key={c.label}>
-                  <a
-                    href={c.href}
-                    target={c.href.startsWith("http") ? "_blank" : undefined}
-                    rel={
-                      c.href.startsWith("http")
-                        ? "noreferrer noopener"
-                        : undefined
-                    }
-                    className="group inline-flex items-center gap-2 opacity-85 transition-opacity hover:opacity-100"
-                  >
-                    {icon && (
-                      <ContactIcon
-                        name={icon}
-                        className="opacity-80 transition-opacity group-hover:opacity-100"
-                      />
-                    )}
-                    <span className="text-[10px] uppercase tracking-[0.32em] opacity-65">
-                      {c.label}
-                    </span>
-                    <span className="border-b border-current/60 pb-0.5 transition-colors group-hover:border-current">
-                      {c.value}
-                    </span>
-                  </a>
-                </li>
-              );
-            })}
+            {slide.contacts.map((c) => (
+              <ContactRow key={c.label} contact={c} />
+            ))}
           </ul>
         )}
         <div className="mt-6 text-[10px] uppercase tracking-[0.35em] opacity-50">
-          {profile.handle} · {profile.location}
+          {profile.handle}
         </div>
       </div>
     </div>
+  );
+}
+
+function ContactRow({
+  contact: c,
+}: {
+  contact: NonNullable<Slide["contacts"]>[number];
+}) {
+  const icon = CONTACT_ICON_MAP[c.label];
+  const [copied, setCopied] = useState(false);
+  const isCopy = c.action === "copy";
+
+  const handleCopy = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(c.href);
+      } else {
+        // 旧浏览器降级：临时 textarea + execCommand
+        const ta = document.createElement("textarea");
+        ta.value = c.href;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      /* noop */
+    }
+  };
+
+  if (isCopy) {
+    return (
+      <li>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="group inline-flex items-center gap-2 opacity-85 transition-opacity hover:opacity-100"
+          aria-label={`copy ${c.label} ${c.href}`}
+        >
+          {icon && (
+            <ContactIcon
+              name={copied ? "copy" : icon}
+              className="opacity-80 transition-opacity group-hover:opacity-100"
+            />
+          )}
+          <span className="text-[10px] uppercase tracking-[0.32em] opacity-65">
+            {c.label}
+          </span>
+          <span className="relative border-b border-dashed border-current/60 pb-0.5 transition-colors group-hover:border-current">
+            {copied ? "copied" : c.value}
+          </span>
+        </button>
+      </li>
+    );
+  }
+
+  return (
+    <li>
+      <a
+        href={c.href}
+        target={c.href.startsWith("http") ? "_blank" : undefined}
+        rel={c.href.startsWith("http") ? "noreferrer noopener" : undefined}
+        className="group inline-flex items-center gap-2 opacity-85 transition-opacity hover:opacity-100"
+      >
+        {icon && (
+          <ContactIcon
+            name={icon}
+            className="opacity-80 transition-opacity group-hover:opacity-100"
+          />
+        )}
+        <span className="text-[10px] uppercase tracking-[0.32em] opacity-65">
+          {c.label}
+        </span>
+        <span className="border-b border-current/60 pb-0.5 transition-colors group-hover:border-current">
+          {c.value}
+        </span>
+      </a>
+    </li>
   );
 }

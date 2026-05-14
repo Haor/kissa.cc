@@ -13,6 +13,7 @@
 
   "slides": {
     "cover": {
+      "kicker": "kissa — index 00",
       "sentence": "as i dreamed."
     },
 
@@ -73,7 +74,9 @@
     "links": {
       "sentence": "the web of mine.",
       "links": {
-        "projects": [{ "label": "TBD", "href": "#" }],
+        "projects": [
+          { "label": "Nexus", "href": "https://nexus.114514.pro/", "note": "personal hub" }
+        ],
         "tools": [{ "label": "TBD", "href": "#" }],
         "friends": [{ "label": "TBD", "href": "#" }]
       }
@@ -86,12 +89,18 @@
         {
           "label": "discord",
           "value": "@haor233",
-          "href": "https://discord.com/users/402097792681508865"
+          "href": "haor233",
+          "action": "copy"
         },
         {
           "label": "telegram",
           "value": "@Haor233",
           "href": "https://t.me/Haor233"
+        },
+        {
+          "label": "vrchat",
+          "value": "kissa",
+          "href": "https://vrchat.com/home/user/usr_670fcf36-65cb-48b9-86d4-018b837d6fed"
         },
         { "label": "back", "value": "to the start", "href": "#cover" }
       ]

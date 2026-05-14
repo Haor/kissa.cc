@@ -228,38 +228,81 @@ float effectMatrix(vec2 uv, float t) {
   return clamp(head * 1.1 + ch + boost, 0.0, 1.0);
 }
 
+// 用 cellId 求"漂移后的星点位置"。每帧调用 4 次（self + 3 邻居），抽函数复用。
+vec2 constellationStarPos(vec2 cellId, float t) {
+  vec2 base = vec2(hash(cellId + 1.7), hash(cellId + 9.1));
+  float phase = hash(cellId + 21.5) * 6.28;
+  // 每个星点绕自己的"基点"画小椭圆 → 整张星图轻微浮动
+  vec2 drift = vec2(
+    cos(t * 0.35 + phase),
+    sin(t * 0.42 + phase * 1.3)
+  ) * 0.18;
+  return clamp(base + drift, 0.05, 0.95);
+}
+
 float effectConstellation(vec2 uv, float t) {
-  vec2 grid = vec2(20.0, 12.0);
-  vec2 cellId = floor(uv * grid);
-  vec2 cellLocal = fract(uv * grid);
-  vec2 starPos = vec2(
-    hash(cellId + 1.7),
-    hash(cellId + 9.1)
-  );
-  float starOn = step(0.78, hash(cellId + 4.3));
-  float pulse = 0.6 + 0.4 * sin(t * 0.5 + hash(cellId) * 6.28);
+  // 密度提升（20×12 → 26×16），星图视觉密度近 1.7×
+  vec2 grid = vec2(26.0, 16.0);
+  // 整张星图轻微"呼吸"位移，让 cell 边界感弱化
+  vec2 breath = vec2(sin(t * 0.18), cos(t * 0.13)) * 0.015;
+  vec2 sampleUv = uv + breath;
+  vec2 cellId = floor(sampleUv * grid);
+  vec2 cellLocal = fract(sampleUv * grid);
+
+  vec2 starPos = constellationStarPos(cellId, t);
+  // 概率密度抬高（0.78 → 0.62），更多星点亮起
+  float starOn = step(0.62, hash(cellId + 4.3));
+  // 闪烁频率拉高 + 范围变宽，更"活"
+  float pulse = 0.45 + 0.55 * sin(t * 1.1 + hash(cellId) * 6.28);
   float starLit = starOn
-    * smoothstep(0.18, 0.02, length(cellLocal - starPos))
+    * smoothstep(0.16, 0.0, length(cellLocal - starPos))
     * pulse;
+
+  // 4 邻居全扫（之前只扫右/下两个），连线密度翻倍
   float line = 0.0;
-  for (int dxI = 0; dxI <= 1; dxI++) {
-    for (int dyI = 0; dyI <= 1; dyI++) {
+  for (int dxI = -1; dxI <= 1; dxI++) {
+    for (int dyI = -1; dyI <= 1; dyI++) {
       if (dxI == 0 && dyI == 0) continue;
       vec2 nId = cellId + vec2(float(dxI), float(dyI));
-      float nOn = step(0.78, hash(nId + 4.3));
+      float nOn = step(0.62, hash(nId + 4.3));
       if (nOn < 0.5) continue;
-      vec2 nPos = vec2(hash(nId + 1.7), hash(nId + 9.1));
+      vec2 nPosLocal = constellationStarPos(nId, t);
       vec2 a = starPos;
-      vec2 b = nPos + vec2(float(dxI), float(dyI));
+      vec2 b = nPosLocal + vec2(float(dxI), float(dyI));
       vec2 pa = cellLocal - a;
       vec2 ba = b - a;
       float tt = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-4), 0.0, 1.0);
       float dist = length(pa - ba * tt);
-      line = max(line, smoothstep(0.04, 0.0, dist) * starOn * nOn * 0.45);
+      // 沿线流动的"信号"：tt 跟时间偏移取 sin，让连线像有数据在跑
+      float flow = 0.5 + 0.5 * sin((tt - t * 0.45) * 12.5 + hash(cellId) * 6.28);
+      float strength = smoothstep(0.05, 0.0, dist) * starOn * nOn;
+      line = max(line, strength * (0.32 + 0.42 * flow));
     }
   }
-  float vignette = smoothstep(1.1, 0.45, length(uv - 0.5));
-  return clamp((starLit + line) * vignette, 0.0, 1.0);
+
+  // 流星：每 ~3 秒一次，沿斜线划过屏幕
+  float meteorSeed = floor(t * 0.35);
+  float meteorOn = step(0.55, hash(vec2(meteorSeed, 7.3)));
+  vec2 mStart = vec2(hash(vec2(meteorSeed, 11.2)) * 1.2 - 0.1,
+                     0.95 + hash(vec2(meteorSeed, 5.9)) * 0.1);
+  float mProg = fract(t * 0.35);
+  vec2 mPos = mStart + vec2(0.9, -1.1) * mProg;
+  vec2 mDelta = uv - mPos;
+  // 顺着 (0.9,-1.1) 方向拖一条尾巴
+  vec2 mDir = normalize(vec2(0.9, -1.1));
+  float along = dot(mDelta, mDir);
+  float across = length(mDelta - mDir * along);
+  float meteor = meteorOn
+    * smoothstep(0.015, 0.0, across)
+    * smoothstep(-0.12, 0.0, along)
+    * smoothstep(0.0, -0.02, along)
+    * 1.2;
+
+  // 极轻底纹（FBM）让无星区域也有低频呼吸感
+  float bg = wfbm(uv * 2.2 + t * 0.06, t * 0.08) * 0.08;
+
+  float vignette = smoothstep(1.1, 0.40, length(uv - 0.5));
+  return clamp((starLit + line + meteor + bg) * vignette, 0.0, 1.0);
 }
 
 float effectStarfield(vec2 uv, float t) {
@@ -343,7 +386,12 @@ void main() {
   } else if (u_effect == 9) {
     cellUv.y -= reach * 0.05;
   } else if (u_effect == 10) {
-    cellUv -= dirAway * reach * 0.04;
+    // 朝鼠标"吸聚" + 微旋转：模拟引力源
+    cellUv -= dirAway * reach * 0.07;
+    cellUv -= u_mouseVel * reach * 0.18;
+    float ang = reach * 0.6;
+    float ca2 = cos(ang), sa2 = sin(ang);
+    cellUv = u_mouse + mat2(ca2, -sa2, sa2, ca2) * (cellUv - u_mouse);
   }
 
   // ===== Scatter / 重组转场位移 =====
@@ -479,7 +527,7 @@ export const GLOW_BY_EFFECT: Record<number, number> = {
   7: 1.15,
   8: 1.1,
   9: 1.3,
-  10: 0.9,
+  10: 1.15,
 };
 
 export function getMonoFontStack(): string {

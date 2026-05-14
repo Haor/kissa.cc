@@ -32,7 +32,10 @@
 
   "slides": {
     // ── 首屏 ─────────────────────────────
-    "cover":  { "sentence": "..." },
+    "cover":  {
+      "kicker":   "...",            // 顶部小字（可选；不填则自动用 "name · index"）
+      "sentence": "..."             // 主标语
+    },
 
     // ── About（个人介绍）────────────────
     "about":  {
@@ -72,11 +75,15 @@
     "contact": {
       "sentence": "...",
       "contacts": [
-        // label 必须是这四种之一（决定显示哪个图标）：
-        //   "email" / "discord" / "telegram" / "back"
+        // label 必须是以下值之一（决定显示哪个图标）：
+        //   "email" / "discord" / "telegram" / "vrchat" / "back"
         { "label": "email",    "value": "...", "href": "mailto:..." },
-        { "label": "discord",  "value": "@...", "href": "https://..." },
+
+        // action: "copy" → 点击按钮把 href 字段复制到剪贴板（不会跳转）
+        { "label": "discord",  "value": "@...", "href": "haor233", "action": "copy" },
+
         { "label": "telegram", "value": "@...", "href": "https://t.me/..." },
+        { "label": "vrchat",   "value": "...",  "href": "https://vrchat.com/home/user/..." },
         { "label": "back",     "value": "to the start", "href": "#cover" }
       ]
     }
