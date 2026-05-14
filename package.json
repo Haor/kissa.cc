@@ -9,8 +9,8 @@
     "lint": "next lint",
     "gen-masks": "tsx scripts/gen-masks.ts",
     "prebuild": "tsx scripts/gen-masks.ts",
-    "deploy": "next build && wrangler pages deploy out --project-name=profile",
-    "deploy:preview": "next build && wrangler pages deploy out --project-name=profile --branch=preview"
+    "deploy": "next build && wrangler pages deploy out --project-name=profile --branch=main --commit-dirty=true",
+    "deploy:preview": "next build && wrangler pages deploy out --project-name=profile --branch=preview --commit-dirty=true"
   },
   "dependencies": {
     "framer-motion": "^11.18.2",

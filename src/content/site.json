@@ -1,0 +1,100 @@
+{
+  "$schema": "./site.schema.json",
+
+  "profile": {
+    "handle": "@kissa",
+    "name": "Kissa",
+    "aka": "椎名晴樹",
+    "title": "Engineer · Daydreamer",
+    "tagline": "As I Dreamed",
+    "bio": "As I Dreamed.",
+    "location": "Shenzhen"
+  },
+
+  "slides": {
+    "cover": {
+      "sentence": "as i dreamed."
+    },
+
+    "about": {
+      "sentence": "Engineer · Daydreamer",
+      "intent": "based in Shenzhen — building things that mostly only I care about.",
+      "cta": { "label": "Email me →", "href": "mailto:i@haor.cc" }
+    },
+
+    "x": {
+      "handle": "@haor233_re",
+      "intent": "thoughts in real time.",
+      "cta": { "label": "Open X →", "href": "https://x.com/haor233_re" }
+    },
+
+    "instagram": {
+      "handle": "@haor233",
+      "intent": "frames i keep.",
+      "cta": {
+        "label": "Open Instagram →",
+        "href": "https://www.instagram.com/haor233/"
+      }
+    },
+
+    "github": {
+      "handle": "@Haor",
+      "intent": "commits speak louder.",
+      "cta": { "label": "Open GitHub →", "href": "https://github.com/Haor" }
+    },
+
+    "huggingface": {
+      "handle": "@haor",
+      "intent": "models i tinker with.",
+      "cta": { "label": "Open HF →", "href": "https://huggingface.co/haor" }
+    },
+
+    "steam": {
+      "handle": "haor233",
+      "intent": "what i'm playing.",
+      "cta": {
+        "label": "Open Steam →",
+        "href": "https://steamcommunity.com/id/haor233/"
+      }
+    },
+
+    "hardware": {
+      "sentence": "the machinery.",
+      "hardware": [
+        { "group": "CPU", "value": "AMD Ryzen 9 9950X3D" },
+        { "group": "GPU", "value": "NVIDIA RTX 5080" },
+        { "group": "BOARD", "value": "ASUS ROG STRIX X870-A Gaming WiFi" },
+        { "group": "VR-HMD", "value": "Meta Quest Pro · Quest 3" },
+        { "group": "VR-INPUT", "value": "Valve Index Knuckles" },
+        { "group": "VR-TRACK", "value": "HTC Vive Tracker 3.0 ×4" }
+      ]
+    },
+
+    "links": {
+      "sentence": "the web of mine.",
+      "links": {
+        "projects": [{ "label": "TBD", "href": "#" }],
+        "tools": [{ "label": "TBD", "href": "#" }],
+        "friends": [{ "label": "TBD", "href": "#" }]
+      }
+    },
+
+    "contact": {
+      "sentence": "until we meet again",
+      "contacts": [
+        { "label": "email", "value": "i@haor.cc", "href": "mailto:i@haor.cc" },
+        {
+          "label": "discord",
+          "value": "@haor233",
+          "href": "https://discord.com/users/402097792681508865"
+        },
+        {
+          "label": "telegram",
+          "value": "@Haor233",
+          "href": "https://t.me/Haor233"
+        },
+        { "label": "back", "value": "to the start", "href": "#cover" }
+      ]
+    }
+  }
+}

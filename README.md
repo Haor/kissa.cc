@@ -1,71 +1,93 @@
 # Profile · ASCII Carousel
 
-横向全屏的 ASCII 个人主页：8 屏每屏代表一个身份名片（介绍 / 社交账号 / 联络），SVG 形状 + WebGL 字符密度共同构成品牌 logo，字符散开/凝聚的转场。
+横向全屏的 ASCII 个人主页 —— 10 屏每屏代表一个身份名片（首屏 / 自述 / 5 个社交账号 / 硬件 / 外链 / 联络），SVG / PNG mask 和 WebGL 字符密度共同构成品牌 logo，翻页时字符散开重组。
 
 ## 技术栈
 
-- **Next.js 15** + **React 19** + **TypeScript** · 静态导出
-- **Tailwind CSS v4** · per-page 主题色
-- 自写 **WebGL2 fragment shader** · 字符 atlas + 程序化噪声场 + SVG mask
-- **framer-motion / zustand** · 输入聚合 + 缓动
+- **Next.js 15** + **React 19** + **TypeScript** · `output: "export"` 纯静态
+- **Tailwind CSS v4**（PostCSS 插件模式）· per-page CSS 变量主题色
+- 自写 **WebGL2 fragment shader** · 字符 atlas + 程序化噪声场 + brand mask
+- **zustand**（carousel 状态）· **next/font/google**（JetBrains Mono 跨平台）
 - 部署：**Cloudflare Pages**（零月费、全球边缘缓存）
 
 ## 本地开发
 
 ```bash
 npm install
-npm run dev
+npm run dev      # http://localhost:3000
+npm run build    # 输出到 out/
+npx tsc --noEmit # 类型检查（无 lint / 无测试套件）
 ```
 
-打开 http://localhost:3000
+部署：
+
+```bash
+npm run deploy           # → profile-9hk.pages.dev (main)
+npm run deploy:preview   # → 预览分支
+```
 
 ## 自定义内容
 
-- 编辑 [`src/lib/data.ts`](src/lib/data.ts) 修改基础信息（名字、handle、tagline、location）
-- 编辑 [`src/lib/slides.ts`](src/lib/slides.ts) 增减/调整 8 屏顺序、文案、CTA、effect 选型
-- 编辑 [`src/lib/theme.ts`](src/lib/theme.ts) 调整每屏主题色
-- 编辑 [`src/assets/masks.ts`](src/assets/masks.ts) 替换品牌 SVG
+**所有文字、链接、handle、硬件清单、外链分组都集中在一个 JSON：**
+
+→ [`src/content/site.json`](src/content/site.json)
+
+字段说明见 [`src/content/README.md`](src/content/README.md)，编辑器会用 `site.schema.json` 自动校验。
+
+视觉相关（每屏的 effect、主题色、字符密度、品牌 mask）：
+
+| 路径 | 作用 |
+|---|---|
+| [`src/lib/slides.ts`](src/lib/slides.ts) | 10 屏的视觉配置层（id / theme / effect / cellSize / ...） |
+| [`src/lib/theme.ts`](src/lib/theme.ts) | 每屏主题色（hex + 0-1 RGB） |
+| [`scripts/mask-sources/`](scripts/mask-sources/) | brand mask 源（SVG 或 PNG），构建时由 `scripts/gen-masks.ts` 离线生成到 `public/masks/` |
 
 ## 关键文件
 
 | 路径 | 作用 |
 |---|---|
-| [`src/components/Carousel.tsx`](src/components/Carousel.tsx) | 翻页核心：wheel / touch / pointer drag / keyboard / hash 输入聚合 |
-| [`src/components/AsciiStage.tsx`](src/components/AsciiStage.tsx) | WebGL 字符渲染器 + mask + scatter 转场 |
-| [`src/components/SlideShell.tsx`](src/components/SlideShell.tsx) | 每屏壳：4 个内容模板（cover / about / brand / contact） |
-| [`src/lib/use-carousel.ts`](src/lib/use-carousel.ts) | zustand store + cooldown |
-| [`src/lib/sound.ts`](src/lib/sound.ts) | 切屏音效（800Hz tick，opt-in） |
+| [`src/components/Carousel.tsx`](src/components/Carousel.tsx) | 翻页核心：wheel / pointer drag / keyboard / hash 聚合，stack 叠放 + opacity cross-fade |
+| [`src/components/SceneStage.tsx`](src/components/SceneStage.tsx) | 全局单实例 ASCII 渲染器（1 个 GL context + 1 个 RAF） |
+| [`src/components/SlideShell.tsx`](src/components/SlideShell.tsx) | 每屏 chrome + 内容模板（cover / about / brand / hardware / links / contact） |
+| [`src/lib/ascii-gl.ts`](src/lib/ascii-gl.ts) | GLSL / atlas builder / charsets / glow / shader 编译器 |
+| [`src/lib/use-carousel.ts`](src/lib/use-carousel.ts) | zustand store + transition cooldown |
 
-## 8 屏顺序
+## 10 屏顺序
 
 ```
-00 cover         drift          (无 mask)        米白 / 黑
-01 about         mushroom       (无 mask)        雾蓝 / 深蓝
-02 x             chaos          X mask           X 蓝 / 深
-03 instagram     mushroom       camera mask      橙红渐变 / 暗紫
-04 github        grid           octocat mask     翠绿 / 黑
-05 huggingface   orbit          🤗 mask          黄 / 深棕
-06 steam         wave           steam gear       蒸汽蓝 / 深
-07 contact       starfield      (reading panel)  米白 / 黑
+00 cover         drift           (无 mask)           米白 / 黑
+01 about         circuit         (无 mask)           雾蓝 / 深蓝
+02 x             chaos           X mask              X 蓝 / 深
+03 instagram     mushroom        camera mask         橙红渐变 / 暗紫
+04 github        grid            octocat mask        翠绿 / 黑
+05 huggingface   orbit           🤗 mask             黄 / 深棕
+06 steam         wave            steam gear          蒸汽蓝 / 深
+07 hardware      matrix          (无 mask)           冷绿 / 深
+08 links         constellation   (无 mask)           靛蓝 / 深
+09 contact       starfield       (无 mask)           米白 / 黑
 ```
 
 ## 输入方式
 
 | 桌面 | 移动 | 备用 |
 |---|---|---|
-| 触控板横扫 / 鼠标滚轮 | 横向 swipe | 拖拽 |
-| `← →` 翻页 | — | `1-8` 直跳 |
-| 点击底部 dot | 点击 dot | URL `/#x` 直链 |
+| 触控板横扫 / 鼠标滚轮 | 横向 swipe（≥18% 屏宽触发） | `← →` 翻页 |
+| `Home` / `End` 直跳首末 | 点击底部 dot | `1-9` 数字直跳 |
+| URL `/#x` 等 hash 直链 | — | — |
 
-## 部署
+## 架构要点（v1 基线）
 
-```bash
-npm run deploy           # CF Pages production
-npm run deploy:preview   # CF Pages preview branch
+```
+page → Carousel
+        ├─ SceneStage         (单 GL context，常驻全屏 canvas)
+        └─ SlideShell × 10    (chrome + 内容；叠放，opacity cross-fade)
 ```
 
-预览：https://profile-9hk.pages.dev
+- **单 stage**：之前每屏一个 GL context，切换时新 context 临时创建 → "突然变一下" + Windows 卡顿。现在所有 effect 的 atlas mount 时预建好、纹理常驻 GPU，切 slide 只动 uniform。
+- **转场**：不再 strip 水平平移；改为 shader 内 `u_transition` 驱动字符散开/重组（前半段旧屏散开、后半段新屏聚合），文本层 opacity 同步 cross-fade。
+- **mask 管线**：build 时 `npm run gen-masks` 把 `scripts/mask-sources/*` 离线光栅化 + dilation + box-blur，输出到 `public/masks/*.png`，运行时直接 `fetch` —— 跨浏览器零 quirk。
+- **字体**：JetBrains Mono 通过 `next/font/google` 自托管，Windows / Mac 字符宽度一致；atlas 在 `document.fonts.ready` 后重建一次保证渲染稳定。
 
-## 旧版本（参考）
+## 历史文档
 
-Litlink 风格的初版完整保留在 [`legacy/v0/`](legacy/v0/)，可独立 `npm install && npm run dev` 运行作为视觉参考。
+旧版交接 / 调试快照见 [`docs/archive/`](docs/archive/)（仅历史参考，不代表当前架构）。

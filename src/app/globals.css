@@ -6,7 +6,7 @@
   --color-muted: #6b7280;
   --color-accent: #a09a8a;
   --color-line: rgba(255, 255, 255, 0.08);
-  --font-mono: "JetBrains Mono", "Fira Code", "IBM Plex Mono", ui-monospace, monospace;
+  --font-mono: var(--font-mono-jetbrains), "JetBrains Mono", "Fira Code", "IBM Plex Mono", ui-monospace, monospace;
   --font-sans: "Inter", ui-sans-serif, system-ui;
 }
 
@@ -39,11 +39,20 @@ body {
   font-feature-settings: "ss01", "cv01";
 }
 
+/* 在 ASCII 画面之上保证文字可读：贴底色的硬投影 + 一圈柔光
+ * 不改变前景色，仅在背景方向"垫"一层，避免与 ASCII 字符颜色撞色。 */
+.text-soft-shadow {
+  text-shadow:
+    0 1px 0 var(--bg, #000),
+    0 0 14px color-mix(in srgb, var(--bg, #000) 70%, transparent);
+}
+
 /* per-slide 主题：在 SlideShell 上设置 inline CSS vars
  *   --bg / --fg / --accent
  *   shader 通过 props 接收 RGB 三元组，无需 CSS 变量 */
 .slide-root {
-  background: var(--bg);
+  /* 背景由 <SceneStage /> 单实例绘制，slide 内容透明叠加 */
+  background: transparent;
   color: var(--fg);
 }
 

@@ -1,0 +1,161 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Site content schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile", "slides"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "handle",
+        "name",
+        "aka",
+        "title",
+        "tagline",
+        "bio",
+        "location"
+      ],
+      "properties": {
+        "handle": { "type": "string" },
+        "name": { "type": "string" },
+        "aka": { "type": "string" },
+        "title": { "type": "string" },
+        "tagline": { "type": "string" },
+        "bio": { "type": "string" },
+        "location": { "type": "string" }
+      }
+    },
+    "slides": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cover",
+        "about",
+        "x",
+        "instagram",
+        "github",
+        "huggingface",
+        "steam",
+        "hardware",
+        "links",
+        "contact"
+      ],
+      "properties": {
+        "cover": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "sentence": { "type": "string" } }
+        },
+        "about": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sentence": { "type": "string" },
+            "intent": { "type": "string" },
+            "cta": { "$ref": "#/definitions/link" }
+          }
+        },
+        "x": { "$ref": "#/definitions/brandSlide" },
+        "instagram": { "$ref": "#/definitions/brandSlide" },
+        "github": { "$ref": "#/definitions/brandSlide" },
+        "huggingface": { "$ref": "#/definitions/brandSlide" },
+        "steam": { "$ref": "#/definitions/brandSlide" },
+        "hardware": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sentence": { "type": "string" },
+            "hardware": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["group", "value"],
+                "properties": {
+                  "group": { "type": "string" },
+                  "value": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "links": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sentence": { "type": "string" },
+            "links": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["projects", "tools", "friends"],
+              "properties": {
+                "projects": { "$ref": "#/definitions/linkList" },
+                "tools": { "$ref": "#/definitions/linkList" },
+                "friends": { "$ref": "#/definitions/linkList" }
+              }
+            }
+          }
+        },
+        "contact": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sentence": { "type": "string" },
+            "contacts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["label", "value", "href"],
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "enum": ["email", "discord", "telegram", "back"]
+                  },
+                  "value": { "type": "string" },
+                  "href": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "href"],
+      "properties": {
+        "label": { "type": "string" },
+        "href": { "type": "string" }
+      }
+    },
+    "brandSlide": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "handle": { "type": "string" },
+        "intent": { "type": "string" },
+        "cta": { "$ref": "#/definitions/link" }
+      }
+    },
+    "linkList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "href"],
+        "properties": {
+          "label": { "type": "string" },
+          "href": { "type": "string" },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  }
+}

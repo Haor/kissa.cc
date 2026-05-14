@@ -2,18 +2,19 @@
 /**
  * Build-time mask generator.
  *
- * 把 src/assets/masks.ts 里的 5 个内嵌 SVG 离线渲染成 PNG 静态资源，输出到
- * public/masks/{id}.png。
+ * 把每个 mask 的源（SVG 或 PNG）离线渲染成 1024×1024 灰度 mask PNG，
+ * 输出到 public/masks/{id}.png。
  *
  * 为什么离线？运行时浏览器 SVG 解码（尤其 Chrome）对含子像素相对坐标的 path
  * 不可靠（典型的就是 GitHub octocat），且 canvas→texture 上传跨浏览器有 alpha
  * 预乘差异。改用预渲染的 PNG 后：
  *   - SVG 光栅化在 Node + @resvg/resvg-js（Rust）里做，跨平台 deterministic
+ *   - PNG 源直接 pngjs decode，灰度阈值化
  *   - 运行时只需 fetch + createImageBitmap，浏览器 PNG 解码 100% 一致
  *
  * 渲染参数（保持视觉效果不变）：
  *   - size = 1024×1024
- *   - padding = 10%（SVG 居中放在 80% 内框）
+ *   - padding = 10%（源居中放在 80% 内框）
  *   - boxMax dilation r ≈ size * 0.6%（约 6 px）
  *   - boxBlur r ≈ size * 1.0%（约 10 px）
  *   - 输出像素 = (density, density, density, 255)，alpha 恒 255 消除预乘歧义
@@ -22,7 +23,7 @@
  */
 import { Resvg } from "@resvg/resvg-js";
 import { PNG } from "pngjs";
-import { writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { MASKS, type MaskId } from "../src/assets/masks.ts";
@@ -30,9 +31,27 @@ import { MASKS, type MaskId } from "../src/assets/masks.ts";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, "..");
 const OUT_DIR = join(REPO_ROOT, "public", "masks");
+const SOURCES_DIR = join(__dirname, "mask-sources");
 
 const SIZE = 1024;
 const PADDING = 0.1;
+
+/**
+ * Mask 源描述。每个 MaskId 选一种：
+ *  - svg: 从 src/assets/masks.ts 取字符串，resvg 渲染
+ *  - png: 从 scripts/mask-sources/{file} 读 PNG（任意尺寸，白色剪影 + 透明背景）
+ */
+type MaskSource =
+  | { kind: "svg" }
+  | { kind: "png"; file: string };
+
+const MASK_SOURCES: Record<MaskId, MaskSource> = {
+  x: { kind: "svg" },
+  instagram: { kind: "svg" },
+  github: { kind: "svg" },
+  huggingface: { kind: "png", file: "huggingface.png" },
+  steam: { kind: "svg" },
+};
 
 function boxMax(src: Uint8Array, w: number, h: number, r: number): Uint8Array {
   const tmp = new Uint8Array(w * h);
@@ -92,19 +111,12 @@ function boxBlur(src: Uint8Array, w: number, h: number, r: number): Uint8Array {
   return out;
 }
 
-async function renderMask(id: MaskId, svg: string): Promise<void> {
-  // 先用 resvg 渲染到一个"内框"大小（应用 padding），居中合成到 SIZE×SIZE。
-  const innerSize = Math.round(SIZE * (1 - PADDING * 2));
-  const resvg = new Resvg(svg, {
-    fitTo: { mode: "width", value: innerSize },
-    background: "rgba(0,0,0,0)",
-  });
-  const rendered = resvg.render();
-  const innerW = rendered.width;
-  const innerH = rendered.height;
-  const innerPixels = rendered.pixels;
-
-  // 1024×1024 alpha buffer（单通道，binary：> 0 即为 255）
+/** 把 (innerPixels RGBA, innerW, innerH) 居中合成到 SIZE×SIZE alpha buffer。 */
+function composeBinary(
+  innerPixels: Uint8Array | Buffer,
+  innerW: number,
+  innerH: number,
+): Uint8Array {
   const w = SIZE;
   const h = SIZE;
   const binary = new Uint8Array(w * h);
@@ -116,16 +128,67 @@ async function renderMask(id: MaskId, svg: string): Promise<void> {
       if (a > 0) binary[(dy + y) * w + (dx + x)] = 255;
     }
   }
+  return binary;
+}
 
-  // dilation + blur，参数与原 svg-mask.ts 一致
+/** 把 PNG buffer 解码并等比缩放到指定 inner 框（保留宽高比、居中），返回 RGBA。 */
+async function decodeAndFitPng(
+  buf: Buffer,
+  innerSize: number,
+): Promise<{ pixels: Uint8Array; width: number; height: number }> {
+  const decoded = PNG.sync.read(buf);
+  const sw = decoded.width;
+  const sh = decoded.height;
+  const scale = Math.min(innerSize / sw, innerSize / sh);
+  const dw = Math.max(1, Math.round(sw * scale));
+  const dh = Math.max(1, Math.round(sh * scale));
+  const out = new Uint8Array(dw * dh * 4);
+  // 最近邻取样：mask 不需要重采样质量，binary 阈值化稳定就够
+  for (let y = 0; y < dh; y++) {
+    const sy = Math.min(sh - 1, Math.floor(y / scale));
+    for (let x = 0; x < dw; x++) {
+      const sx = Math.min(sw - 1, Math.floor(x / scale));
+      const si = (sy * sw + sx) * 4;
+      const di = (y * dw + x) * 4;
+      out[di] = decoded.data[si];
+      out[di + 1] = decoded.data[si + 1];
+      out[di + 2] = decoded.data[si + 2];
+      out[di + 3] = decoded.data[si + 3];
+    }
+  }
+  return { pixels: out, width: dw, height: dh };
+}
+
+async function renderMask(id: MaskId): Promise<void> {
+  const innerSize = Math.round(SIZE * (1 - PADDING * 2));
+  const source = MASK_SOURCES[id];
+  let binary: Uint8Array;
+
+  if (source.kind === "svg") {
+    const svg = MASKS[id];
+    const resvg = new Resvg(svg, {
+      fitTo: { mode: "width", value: innerSize },
+      background: "rgba(0,0,0,0)",
+    });
+    const rendered = resvg.render();
+    binary = composeBinary(
+      rendered.pixels,
+      rendered.width,
+      rendered.height,
+    );
+  } else {
+    const buf = await readFile(join(SOURCES_DIR, source.file));
+    const fitted = await decodeAndFitPng(buf, innerSize);
+    binary = composeBinary(fitted.pixels, fitted.width, fitted.height);
+  }
+
   const dilateR = Math.max(2, Math.round(SIZE * 0.006));
   const blurR = Math.max(2, Math.round(SIZE * 0.01));
-  const dilated = boxMax(binary, w, h, dilateR);
-  const blurred = boxBlur(dilated, w, h, blurR);
+  const dilated = boxMax(binary, SIZE, SIZE, dilateR);
+  const blurred = boxBlur(dilated, SIZE, SIZE, blurR);
 
-  // 写到 RGBA buffer：(v, v, v, 255)。alpha 恒 255 消除任何预乘歧义。
-  const png = new PNG({ width: w, height: h, colorType: 6 });
-  for (let i = 0; i < w * h; i++) {
+  const png = new PNG({ width: SIZE, height: SIZE, colorType: 6 });
+  for (let i = 0; i < SIZE * SIZE; i++) {
     const v = blurred[i];
     png.data[i * 4] = v;
     png.data[i * 4 + 1] = v;
@@ -136,17 +199,17 @@ async function renderMask(id: MaskId, svg: string): Promise<void> {
   const buf = PNG.sync.write(png, { colorType: 6 });
   await writeFile(outPath, buf);
 
-  // 简要 stats
   let nonZero = 0;
   let solid = 0;
-  for (let i = 0; i < w * h; i++) {
+  for (let i = 0; i < SIZE * SIZE; i++) {
     if (blurred[i] > 0) nonZero++;
     if (blurred[i] >= 224) solid++;
   }
-  const nzPct = ((nonZero / (w * h)) * 100).toFixed(1);
-  const solidPct = ((solid / (w * h)) * 100).toFixed(1);
+  const nzPct = ((nonZero / (SIZE * SIZE)) * 100).toFixed(1);
+  const solidPct = ((solid / (SIZE * SIZE)) * 100).toFixed(1);
+  const kind = source.kind.toUpperCase();
   console.log(
-    `  ${id.padEnd(12)} → ${outPath.replace(REPO_ROOT + "/", "")}  ` +
+    `  ${id.padEnd(12)} [${kind}] → ${outPath.replace(REPO_ROOT + "/", "")}  ` +
       `(${(buf.length / 1024).toFixed(1)} KB, nonZero=${nzPct}%, solid=${solidPct}%)`,
   );
 }
@@ -154,9 +217,9 @@ async function renderMask(id: MaskId, svg: string): Promise<void> {
 async function main() {
   await mkdir(OUT_DIR, { recursive: true });
   console.log(`Generating masks → ${OUT_DIR.replace(REPO_ROOT + "/", "")}/`);
-  const ids = Object.keys(MASKS) as MaskId[];
+  const ids = Object.keys(MASK_SOURCES) as MaskId[];
   for (const id of ids) {
-    await renderMask(id, MASKS[id]);
+    await renderMask(id);
   }
   console.log(`✓ ${ids.length} masks generated`);
 }
