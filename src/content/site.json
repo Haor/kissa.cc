@@ -19,7 +19,7 @@
 
     "about": {
       "sentence": "Engineer · Daydreamer",
-      "intent": "based in Shenzhen — drifting between the physical and the virtual, building little worlds mostly only I care about.",
+      "intent": "based in Shenzhen — drifting between the physical and the virtual, making things mostly only I care about.",
       "cta": { "label": "Email me →", "href": "mailto:i@haor.cc" }
     },
 
@@ -75,9 +75,39 @@
       "sentence": "the web of mine.",
       "links": {
         "projects": [
-          { "label": "Nexus", "href": "https://nexus.114514.pro/", "note": "VRC friends feed" }
+          {
+            "label": "vrc_nexus",
+            "href": "https://github.com/Haor/vrc_nexus",
+            "note": "Nexus source"
+          },
+          {
+            "label": "cf-ai-proxy",
+            "href": "https://github.com/Haor/cf-ai-proxy",
+            "note": "AI reverse proxy"
+          },
+          {
+            "label": "avatar-publisher",
+            "href": "https://github.com/Haor/avatar-publisher-frontend",
+            "note": "VRC avatar publisher"
+          },
+          {
+            "label": "human-bubble-replies",
+            "href": "https://github.com/Haor/human-bubble-replies",
+            "note": "experiment"
+          }
         ],
-        "tools": [{ "label": "TBD", "href": "#" }],
+        "tools": [
+          {
+            "label": "Nexus",
+            "href": "https://nexus.114514.pro/",
+            "note": "VRC friends feed"
+          },
+          {
+            "label": "AI Proxy",
+            "href": "https://ai-proxy.or-z.org/",
+            "note": "reverse proxy"
+          }
+        ],
         "friends": [{ "label": "TBD", "href": "#" }]
       }
     },
