@@ -52,6 +52,7 @@ export function Carousel() {
   }>({ accum: 0, lastEvent: 0, armed: true });
 
   const index = useCarousel((s) => s.index);
+  const prevIndex = useCarousel((s) => s.prevIndex);
   const direction = useCarousel((s) => s.direction);
   const busy = useCarousel((s) => s.busy);
   const transition = useCarousel((s) => s.transition);
@@ -251,7 +252,8 @@ export function Carousel() {
   // 转场后半段（progress 0.5..1）：新屏 opacity 0→1
   // 稳态：只有 active 屏 opacity = 1
   const isTransitioning = busy && direction !== 0;
-  const outgoingIdx = isTransitioning ? index - direction : -1;
+  // 用 store 里实际存的 prevIndex，而非 index-direction（数字跳转时跨度可能 >1）
+  const outgoingIdx = isTransitioning ? prevIndex : -1;
   const incomingIdx = index;
   const opacityFor = (i: number): number => {
     if (!isTransitioning) return i === incomingIdx ? 1 : 0;

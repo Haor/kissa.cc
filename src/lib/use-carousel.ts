@@ -17,6 +17,8 @@ const COOLDOWN_MS = 720; // 转场 600ms + 120ms 缓冲
 
 export type CarouselState = {
   index: number;
+  /** 转场期间的"旧屏"index；稳态时 = index */
+  prevIndex: number;
   /** 上一次翻页方向：-1 / 0 / +1 */
   direction: -1 | 0 | 1;
   /** transition 进度 0..1；0 表示稳态，1 表示完成切换那一瞬间 */
@@ -39,6 +41,7 @@ const clamp = (n: number) => Math.max(0, Math.min(last, n));
 
 export const useCarousel = create<CarouselState & CarouselActions>((set, get) => ({
   index: 0,
+  prevIndex: 0,
   direction: 0,
   transition: 0,
   busy: false,
@@ -61,6 +64,7 @@ export const useCarousel = create<CarouselState & CarouselActions>((set, get) =>
     const direction = next > state.index ? 1 : -1;
     set({
       index: next,
+      prevIndex: state.index,
       direction,
       transition: 0,
       busy: true,
@@ -78,8 +82,8 @@ export const useCarousel = create<CarouselState & CarouselActions>((set, get) =>
   },
 
   finishTransition() {
-    const { pending } = get();
-    set({ transition: 0, busy: false, direction: 0 });
+    const { pending, index } = get();
+    set({ transition: 0, busy: false, direction: 0, prevIndex: index });
     if (pending !== null) {
       // 立即触发挂起的目标
       setTimeout(() => get().gotoIndex(pending), 0);

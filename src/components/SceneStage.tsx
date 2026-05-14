@@ -58,13 +58,14 @@ export function SceneStage() {
   // 当前 active slide 的 theme bg —— 用 React 同步更新 canvas 背景色
   // （bg 是 CSS 设置，shader alpha=0 时显示出来）
   const carouselIndex = useCarousel((s) => s.index);
+  const carouselPrev = useCarousel((s) => s.prevIndex);
   const direction = useCarousel((s) => s.direction);
   const transitionProgress = useCarousel((s) => s.transition);
   const busy = useCarousel((s) => s.busy);
   // 转场中点切 bg 色：与 shader 内 displaySlide 切换时机一致
   const bgSlide: Slide =
     busy && direction !== 0 && transitionProgress < 0.5
-      ? SLIDES[carouselIndex - direction] ?? SLIDES[carouselIndex]
+      ? SLIDES[carouselPrev] ?? SLIDES[carouselIndex]
       : SLIDES[carouselIndex];
   const bgColor = THEMES[bgSlide.theme].bg;
 
@@ -342,6 +343,7 @@ export function SceneStage() {
       // 直接从 zustand store 读最新 transition 状态（每帧最新，不重建 effect）
       const s = useCarousel.getState();
       const idx = s.index;
+      const prev = s.prevIndex;
       const dir = s.direction;
       const progress = s.transition;
       const isBusy = s.busy;
@@ -353,7 +355,8 @@ export function SceneStage() {
         uTrans = 0;
       } else if (progress < 0.5) {
         // 前半段：旧屏散开 (0 → +1)
-        displaySlide = SLIDES[idx - dir] ?? SLIDES[idx];
+        // 用 store.prevIndex 避免数字跳转 (跨度 > 1) 时错算成中间页
+        displaySlide = SLIDES[prev] ?? SLIDES[idx];
         uTrans = progress * 2;
       } else {
         // 后半段：新屏聚合 (-1 → 0)
