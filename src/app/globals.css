@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #050608;
+  --color-fg: #e8e6df;
+  --color-muted: #6b7280;
+  --color-accent: #a09a8a;
+  --color-line: rgba(255, 255, 255, 0.08);
+  --font-mono: "JetBrains Mono", "Fira Code", "IBM Plex Mono", ui-monospace, monospace;
+  --font-sans: "Inter", ui-sans-serif, system-ui;
+}
+
+html,
+body {
+  background: var(--bg, var(--color-bg));
+  color: var(--fg, var(--color-fg));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+  overflow: hidden;
+}
+
+html {
+  height: 100%;
+}
+body {
+  min-height: 100vh;
+  height: 100%;
+}
+
+::selection {
+  background: var(--fg, var(--color-fg));
+  color: var(--bg, var(--color-bg));
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "ss01", "cv01";
+}
+
+/* per-slide 主题：在 SlideShell 上设置 inline CSS vars
+ *   --bg / --fg / --accent
+ *   shader 通过 props 接收 RGB 三元组，无需 CSS 变量 */
+.slide-root {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* 极简的"键盘按键"标签 */
+.kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--fg) 30%, transparent);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  color: color-mix(in srgb, var(--fg) 80%, transparent);
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+.blink { animation: blink 1.1s steps(1) infinite; }
+
+/* 用户偏好减弱动画时，关闭非必要动效 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
