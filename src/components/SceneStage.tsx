@@ -278,8 +278,14 @@ export function SceneStage() {
             at.rows = info.rows;
             at.charsetLen = info.charsetLen;
           }
-          // 强制下一帧 applySlide 重新设当前 effect 的 cols/rows
-          currentEffect = -1;
+          // 上面的循环结束时 TEXTURE0 绑的是 allEffects 末尾的 atlas。
+          // 长时间停留的屏（cover/about）不会再走 applySlide，得手动把 active
+          // effect 的 atlas 绑回去，否则 shader 用当前 cols/len 去采样错纹理。
+          const activeAtlas = atlases.get(currentEffect);
+          if (activeAtlas) {
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, activeAtlas.tex);
+          }
         })
         .catch(() => {});
     }
