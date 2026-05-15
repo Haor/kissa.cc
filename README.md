@@ -1,6 +1,8 @@
-# Profile · ASCII Carousel
+# kissa.cc · ASCII Carousel
 
 横向全屏的 ASCII 个人主页 —— 10 屏每屏代表一个身份名片（首屏 / 自述 / 5 个社交账号 / 硬件 / 外链 / 联络），SVG / PNG mask 和 WebGL 字符密度共同构成品牌 logo，翻页时字符散开重组。
+
+线上：[profile-9hk.pages.dev](https://profile-9hk.pages.dev) · 源码：[github.com/Haor/kissa.cc](https://github.com/Haor/kissa.cc)
 
 ## 技术栈
 
@@ -72,7 +74,7 @@ npm run deploy:preview   # → 预览分支
 | 桌面 | 移动 | 备用 |
 |---|---|---|
 | 触控板横扫 / 鼠标滚轮 | 横向 swipe（≥18% 屏宽触发） | `← →` 翻页 |
-| `Home` / `End` 直跳首末 | 点击底部 dot | `1-9` 数字直跳 |
+| `Home` / `End` 直跳首末 | 点击底部数字 (00–09) | `0-9` 数字直跳 |
 | URL `/#x` 等 hash 直链 | — | — |
 
 ## 架构要点（v1 基线）
@@ -88,6 +90,3 @@ page → Carousel
 - **mask 管线**：build 时 `npm run gen-masks` 把 `scripts/mask-sources/*` 离线光栅化 + dilation + box-blur，输出到 `public/masks/*.png`，运行时直接 `fetch` —— 跨浏览器零 quirk。
 - **字体**：JetBrains Mono 通过 `next/font/google` 自托管，Windows / Mac 字符宽度一致；atlas 在 `document.fonts.ready` 后重建一次保证渲染稳定。
 
-## 历史文档
-
-旧版交接 / 调试快照见 [`docs/archive/`](docs/archive/)（仅历史参考，不代表当前架构）。
