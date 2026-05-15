@@ -1,16 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { JetBrains_Mono } from "next/font/google";
 import { profile } from "@/lib/data";
+// Iosevka (拉丁等宽，瘦窄复古终端字形) + Sarasa Mono J (subset 后的 CJK)
+// 共同构成站点的等宽字体栈。Iosevka 通过 fontsource 自托管，CJK 由
+// scripts/gen-fonts.ts 从 Sarasa-Regular.ttc 抽出本站实际用到的字符。
+import "@fontsource/iosevka/400.css";
+import "@fontsource/iosevka/500.css";
+import "@fontsource/iosevka/600.css";
 import "./globals.css";
-
-// self-host JetBrains Mono via next/font。build 时下载到 _next/static/media，
-// 运行时不再访问 Google，跨 Mac/Windows 字体完全一致。
-const jetbrains = JetBrains_Mono({
-  subsets: ["latin"],
-  display: "swap",
-  weight: ["400", "500", "600"],
-  variable: "--font-mono-jetbrains",
-});
 
 export const metadata: Metadata = {
   title: `${profile.name} · ${profile.tagline}`,
@@ -27,7 +23,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN" className={`${jetbrains.variable} dark`}>
+    <html lang="zh-CN" className="dark">
+      <head>
+        {/* 自托管 CJK subset (~80KB)，preload 避免首屏中日字符 FOUT */}
+        <link
+          rel="preload"
+          href="/fonts/cjk-mono.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className="min-h-screen bg-bg text-fg antialiased">{children}</body>
     </html>
   );

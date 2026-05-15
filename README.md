@@ -2,8 +2,6 @@
 
 横向全屏的 ASCII 个人主页 —— 10 屏每屏代表一个身份名片（首屏 / 自述 / 5 个社交账号 / 硬件 / 外链 / 联络），SVG / PNG mask 和 WebGL 字符密度共同构成品牌 logo，翻页时字符散开重组。
 
-线上：[kissa.cc](https://kissa.cc) · 源码：[github.com/Haor/kissa.cc](https://github.com/Haor/kissa.cc)
-
 ## 技术栈
 
 - **Next.js 15** + **React 19** + **TypeScript** · `output: "export"` 纯静态
@@ -20,10 +18,6 @@ npm run dev      # http://localhost:3000
 npm run build    # 输出到 out/
 npx tsc --noEmit # 类型检查（无 lint / 无测试套件）
 ```
-
-## 部署
-
-`master` 分支由 Cloudflare Pages 通过 GitHub 自动构建并发布到 [kissa.cc](https://kissa.cc)；其他分支会自动生成 preview 子域。本地不再需要手动部署命令——`git push origin master` 就是 release。
 
 ## 自定义内容
 

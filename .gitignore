@@ -10,3 +10,5 @@ next-env.d.ts
 /*.png
 docs/
 wrangler.toml
+# 字体源（~4MB）只在本地，subset 出来的 woff2 才 commit
+scripts/font-sources/

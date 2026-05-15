@@ -1,13 +1,36 @@
 @import "tailwindcss";
 
+/* 字符级 subset 的 Source Han Code JP（仅含站点实际用到的中日字符 ~80KB）。
+   配合 unicode-range，让浏览器对 CJK 字符走这份自托管 woff2，不再依赖系统
+   字体（PingFang vs YaHei），跨平台渲染完全一致。
+   生成方式：scripts/gen-fonts.ts（源 OTF 在 scripts/font-sources/，gitignore）。 */
+@font-face {
+  font-family: "CJK Mono";
+  src: url("/fonts/cjk-mono.woff2") format("woff2");
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+2000-206F,   /* general punctuation */
+    U+2E80-2EFF,   /* CJK radicals supplement */
+    U+3000-303F,   /* CJK symbols and punctuation */
+    U+3040-309F,   /* hiragana */
+    U+30A0-30FF,   /* katakana */
+    U+3400-4DBF,   /* CJK ext A */
+    U+4E00-9FFF,   /* CJK unified ideographs */
+    U+F900-FAFF,   /* CJK compatibility ideographs */
+    U+FF00-FFEF;   /* halfwidth/fullwidth forms */
+}
+
 @theme {
   --color-bg: #050608;
   --color-fg: #e8e6df;
   --color-muted: #6b7280;
   --color-accent: #a09a8a;
   --color-line: rgba(255, 255, 255, 0.08);
-  --font-mono: var(--font-mono-jetbrains), "JetBrains Mono", "Fira Code", "IBM Plex Mono", ui-monospace, monospace;
-  --font-sans: "Inter", ui-sans-serif, system-ui;
+  /* Iosevka 处理拉丁，"CJK Mono"（subset 自 Sarasa Mono J）处理中日 */
+  --font-mono: "Iosevka", "CJK Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-sans: "Inter", "CJK Mono", ui-sans-serif, system-ui, sans-serif;
 }
 
 html,
