@@ -132,13 +132,11 @@ function CoverContent({ slide }: { slide: Slide }) {
           {profile.name} <span className="opacity-55">·</span> {profile.aka}
         </div>
         <div className="mt-1 text-xs opacity-60">{profile.title}</div>
-        <div className="mt-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] opacity-70">
-          <span className="kbd">→</span>
+        <div className="mt-6 flex items-center gap-3 text-[10px] uppercase tracking-[0.3em] opacity-70">
+          <span>→</span>
           <span>slide</span>
-          <span className="opacity-45">·</span>
-          <span className="kbd">0</span>
-          <span className="opacity-45">..</span>
-          <span className="kbd">9</span>
+          <span className="opacity-40">·</span>
+          <span>0–9</span>
           <span>jump</span>
         </div>
       </div>
