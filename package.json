@@ -1,5 +1,5 @@
 {
-  "name": "profile",
+  "name": "kissa.cc",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,9 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "gen-masks": "tsx scripts/gen-masks.ts",
-    "prebuild": "tsx scripts/gen-masks.ts",
-    "deploy": "next build && wrangler pages deploy out --project-name=profile --branch=main --commit-dirty=true",
-    "deploy:preview": "next build && wrangler pages deploy out --project-name=profile --branch=preview --commit-dirty=true"
+    "prebuild": "tsx scripts/gen-masks.ts"
   },
   "dependencies": {
     "framer-motion": "^11.18.2",
