@@ -8,7 +8,6 @@
 - **Tailwind CSS v4**（PostCSS 插件模式）· per-page CSS 变量主题色
 - 自写 **WebGL2 fragment shader** · 字符 atlas + 程序化噪声场 + brand mask
 - **zustand**（carousel 状态）· **next/font/google**（JetBrains Mono 跨平台）
-- 部署：**Cloudflare Pages**（零月费、全球边缘缓存）
 
 ## 本地开发
 
@@ -80,4 +79,3 @@ page → Carousel
 - **转场**：不再 strip 水平平移；改为 shader 内 `u_transition` 驱动字符散开/重组（前半段旧屏散开、后半段新屏聚合），文本层 opacity 同步 cross-fade。
 - **mask 管线**：build 时 `npm run gen-masks` 把 `scripts/mask-sources/*` 离线光栅化 + dilation + box-blur，输出到 `public/masks/*.png`，运行时直接 `fetch` —— 跨浏览器零 quirk。
 - **字体**：JetBrains Mono 通过 `next/font/google` 自托管，Windows / Mac 字符宽度一致；atlas 在 `document.fonts.ready` 后重建一次保证渲染稳定。
-
