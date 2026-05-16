@@ -81,9 +81,9 @@ function SlideChrome({
   return (
     <>
       <div className="text-soft-shadow pointer-events-none absolute left-6 top-6 z-20 font-mono text-[11px] uppercase tracking-[0.32em] opacity-70">
-        <span>{String(index + 1).padStart(2, "0")}</span>
+        <span>{String(index).padStart(2, "0")}</span>
         <span className="mx-1 opacity-60">/</span>
-        <span className="opacity-70">{String(total).padStart(2, "0")}</span>
+        <span className="opacity-70">{String(total - 1).padStart(2, "0")}</span>
         <span className="mx-3 opacity-40">·</span>
         <span className="opacity-90">{slide.label}</span>
       </div>
