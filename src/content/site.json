@@ -78,7 +78,8 @@
         "projects": [
           {
             "label": "Echoless",
-            "href": "https://github.com/Haor/Echoless"
+            "href": "https://github.com/Haor/Echoless",
+            "note": "Real-time AEC tool"
           },
           {
             "label": "vrc_nexus",
