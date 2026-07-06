@@ -67,7 +67,8 @@
         { "group": "BOARD", "value": "ASUS ROG STRIX X870-A Gaming WiFi" },
         { "group": "VR-HMD", "value": "Meta Quest Pro · Quest 3" },
         { "group": "VR-INPUT", "value": "Valve Index Knuckles" },
-        { "group": "VR-TRACK", "value": "HTC Vive Tracker 3.0 ×4" }
+        { "group": "VR-TRACK", "value": "HTC Vive Tracker 3.0 ×9" },
+        { "group": "FACE-TRACK", "value": "Paper Tracker" }
       ]
     },
 
@@ -75,6 +76,10 @@
       "sentence": "the web of mine.",
       "links": {
         "projects": [
+          {
+            "label": "Echoless",
+            "href": "https://github.com/Haor/Echoless"
+          },
           {
             "label": "vrc_nexus",
             "href": "https://github.com/Haor/vrc_nexus",
@@ -89,11 +94,6 @@
             "label": "avatar-publisher",
             "href": "https://github.com/Haor/avatar-publisher-frontend",
             "note": "VRC avatar publisher"
-          },
-          {
-            "label": "human-bubble-replies",
-            "href": "https://github.com/Haor/human-bubble-replies",
-            "note": "experiment"
           }
         ],
         "tools": [
