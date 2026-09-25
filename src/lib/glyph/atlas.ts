@@ -13,7 +13,7 @@ export const CHARSETS: Record<number, string> = {
   3: " ·∙•○◎●", //        neural：连线 ·，脉冲 •，节点待命 ○ / 激活 ●
   4: " .,;-+*#%@", //     timeline：正文是 -，名字 *，头像 %
   5: " .:-=+#",
-  6: " ·.°oO*#", //       drift：泡沫云 ° o O（实心），边缘 · .，「夢」* #
+  6: " ·.,:-=+*#", //     drift：v1 的云雾
   7: " ·.:-~+*#", //      thread：线身是 * / #
   8: " .:_=-|+*#", //     circuit：走线 -，焊盘 / 数据包 #
   9: " ·.:-=+|#", //      meters：负载柱是 |，柱顶 #
@@ -24,6 +24,11 @@ export const CHARSETS: Record<number, string> = {
 export const SCRAMBLE = " !#$%&*+-/<=>?@[]\\^_{|}~01";
 
 export const SCRAMBLE_ROW = Object.keys(CHARSETS).length;
+
+/** 泡泡字符行：effect 写 g_alt 的格子改用这一行取字形（首屏漂浮的泡泡云团） */
+export const BUBBLE = " ·°oO";
+
+export const BUBBLE_ROW = SCRAMBLE_ROW + 1;
 
 export type Atlas = {
   canvas: HTMLCanvasElement;
@@ -48,6 +53,7 @@ export function buildAtlas(tile: number): Atlas {
       .sort((a, b) => a - b)
       .map((k) => CHARSETS[k]),
     SCRAMBLE,
+    BUBBLE,
   ];
   const cols = Math.max(...rowsSrc.map((r) => [...r].length));
   const rows = rowsSrc.length;

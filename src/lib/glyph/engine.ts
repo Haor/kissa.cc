@@ -5,7 +5,7 @@ import {
   BLUR_FRAG,
   COMPOSE_FRAG,
 } from "./shaders";
-import { buildAtlas, charsetLength, SCRAMBLE, SCRAMBLE_ROW } from "./atlas";
+import { buildAtlas, charsetLength, SCRAMBLE, SCRAMBLE_ROW, BUBBLE, BUBBLE_ROW } from "./atlas";
 import { Invaders } from "./invaders";
 
 /** Steam 屏的 effect id：它的游戏状态在 CPU 上跑，只在这一屏可见时推进 */
@@ -351,7 +351,7 @@ export class GlyphEngine {
         "u_field", "u_style", "u_glowTex", "u_atlas", "u_res", "u_grid", "u_cellPx", "u_time", "u_aspect",
         "u_inkA", "u_inkB", "u_glyphA", "u_glyphB", "u_glowA", "u_glowB", "u_accA", "u_accB",
         "u_glowAmtA", "u_glowAmtB",
-        "u_rowLenA", "u_rowLenB", "u_rowLenScr", "u_intro",
+        "u_rowLenA", "u_rowLenB", "u_rowLenScr", "u_rowLenAlt", "u_intro",
       ]),
     };
 
@@ -713,6 +713,7 @@ export class GlyphEngine {
     gl.uniform2f(cu.u_rowLenA, ea, charsetLength(ea));
     gl.uniform2f(cu.u_rowLenB, eb, charsetLength(eb));
     gl.uniform2f(cu.u_rowLenScr, SCRAMBLE_ROW, [...SCRAMBLE].length);
+    gl.uniform2f(cu.u_rowLenAlt, BUBBLE_ROW, [...BUBBLE].length);
     gl.uniform1f(cu.u_intro, this.booted ? 0.35 + 0.65 * this.intro : 0.35);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }

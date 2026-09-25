@@ -134,6 +134,7 @@ vec2  g_place;  // 当前 scene 的 figure 中心
 vec2  g_grid;   // 字符格行列数
 float g_acc;    // effect 自定义：用描边色画（0..1）
 float g_fill;   // effect 自定义：字符格底色块（0..1）
+float g_alt;    // effect 自定义：改用泡泡字符行（0 / 1）
 
 // ===========================================================================
 // 1 · FILM —— Instagram「frames i keep.」
@@ -465,72 +466,50 @@ float effectGrid(vec2 uv, float t) {
 
 // ===========================================================================
 // 6 · DRIFT —— cover「as i dreamed.」
-// 泡泡质感的云：云团是实心的，由 ° o O 这些像小气泡的字符填满，边缘散成 · .。
-//   · 右下角一大团（像 v1 那样），形状由低频噪声塑造，慢慢起伏
-//   · 其它地方零散几小团，每团由三个绕着转的小圆团组成，轮廓有规律地变换、呼吸
-//   · 云团附近还有极细的小泡泡（单个 o）往上冒
-// 「夢」落在 * / # 两档，和云的质感分开。
+// 底下是 v1 原样的云雾（右下那一大团就是它）；左上方的空处有几团泡泡质感的
+// 小云慢慢从右往左漂过、渐显渐隐。每团由几个绕着转的小圆团叠成，轮廓有规律地
+// 变形、一张一缩地呼吸；里面是实心的，用单独的泡泡字符行（· ° o O）来画。
 // ===========================================================================
-float foamDensity(vec2 sp, float t) {
-  // 右下角的大团：一个被横向拉长的大高斯，乘上低频噪声让轮廓有机
-  vec2 bm = vec2(0.86 * u_aspect, 0.2);
-  vec2 bq = (sp - bm) * vec2(0.62, 1.0);
-  float big = exp(-dot(bq, bq) / 0.075) * (0.55 + 0.9 * fbm(sp * 2.6 + vec2(t * 0.05, -t * 0.03)));
-
-  // 零散的小团：位置慢慢漂，大小呼吸，三个子团绕中心转，形状一直在变
-  float puffs = 0.0;
-  for (int k = 0; k < 7; k++) {
-    float fk = float(k);
-    vec2 c = vec2((0.08 + hash(vec2(fk, 1.0)) * 0.84) * u_aspect, 0.3 + hash(vec2(fk, 2.0)) * 0.58);
-    c += vec2(sin(u_time * 0.05 + fk * 1.9), cos(u_time * 0.04 + fk * 1.3)) * vec2(0.08, 0.03);
-    float r = (0.035 + hash(vec2(fk, 3.0)) * 0.03) * (0.8 + 0.25 * sin(u_time * 0.45 + fk * 2.1));
-    for (int j = 0; j < 3; j++) {
-      float fj = float(j);
-      float ang = hash(vec2(fk, fj + 5.0)) * 6.2831 + u_time * 0.12 * (fj + 1.0) * (mod(fk, 2.0) * 2.0 - 1.0);
-      vec2 q = sp - c - vec2(cos(ang), sin(ang)) * r * 0.7;
-      puffs += exp(-dot(q, q) / (r * r));
-    }
-  }
-  return big * 1.25 + puffs * 0.8;
-}
-
-float tinyBubbles(vec2 p, float near) {
-  const float S = 0.05;                 // 网格边长（视口高度单位）
-  vec2 q = p / S;
-  q.y -= u_time * 0.022 / S;
-  vec2 id0 = floor(q);
-  float v = 0.0;
-  for (int dx = -1; dx <= 1; dx++) {
-    for (int dy = -1; dy <= 1; dy++) {
-      vec2 id = id0 + vec2(float(dx), float(dy));
-      float h = hash(id + 17.0);
-      if (h > 0.18) continue;
-      vec2 c = id + 0.5 + (vec2(hash(id + 3.3), hash(id + 5.1)) - 0.5) * 0.5;
-      c.x += sin(u_time * 0.8 + h * 60.0 + q.y * 0.9) * 0.18;
-      float r = (0.006 + hash(id + 9.7) * 0.005) / S;
-      v = max(v, smoothstep(r, r * 0.4, length(q - c)) * 0.64);
-    }
-  }
-  return v * smoothstep(0.1, 0.6, near);
-}
-
 float effectDrift(vec2 uv, float t) {
-  vec2 sp = g_suv * vec2(u_aspect, 1.0);
+  vec2 p = uv * vec2(2.6, 1.8) + vec2(t * 0.04, -t * 0.025);
+  float n = wfbm(p, t * 0.18);
+  n = smoothstep(0.32, 0.82, n);
+  float vignette = smoothstep(1.15, 0.45, length(uv - 0.5));
+  n *= vignette;
+  n += (hash(floor(uv * 60.0) + floor(t * 6.0)) - 0.5) * 0.05;
+
+  vec2 asp = vec2(u_aspect, 1.0);
+  vec2 sp = g_suv * asp;
   vec2 c = floor(g_suv * g_grid);
-  float erode = (fbm(sp * 8.0 + vec2(u_time * 0.03, 0.0)) - 0.5) * 0.6;
-  float d = foamDensity(sp, t) + erode;
-  float body = smoothstep(0.25, 1.0, d);
-  // 泡沫的颗粒：每格在 ° o O 之间慢慢换，像气泡在冒
-  float grain = hash(c + floor(u_time * 0.6 + hash(c) * 4.0));
-  float foam = body * (0.44 + 0.26 * grain) + smoothstep(0.9, 1.6, d) * 0.08;
-
-  // v1 的雾退到最后面，只剩 · . 两档
-  vec2 fp = uv * vec2(2.6, 1.8) + vec2(t * 0.04, -t * 0.025);
-  float fog = min(smoothstep(0.32, 0.82, wfbm(fp, t * 0.18)) * 0.3, 0.24);
-
-  float bub = tinyBubbles(sp, smoothstep(0.1, 0.8, foamDensity(sp + vec2(0.0, -0.06), t)));
-  float v = max(max(fog, foam), bub);
-  return clamp(v, 0.0, 1.0);
+  float puff = 0.0;
+  for (int k = 0; k < 3; k++) {
+    float fk = float(k);
+    float ph = u_time / 24.0 + fk / 3.0;
+    float f = fract(ph);
+    float seed = floor(ph) * 3.0 + fk;
+    // 走左上方那片空处：右边是「夢」，左下是文案
+    vec2 gc = vec2(mix(0.62, -0.12, f), 0.64 + fk * 0.1 + sin(f * 6.2831 + fk * 2.0) * 0.03) * asp;
+    float sc = 0.8 + hash(vec2(seed, 1.0)) * 0.4;
+    float breathe = 0.85 + 0.15 * sin(u_time * 0.9 + fk * 2.1);
+    float d = 0.0;
+    for (int j = 0; j < 4; j++) {
+      float fj = float(j);
+      float ang = hash(vec2(seed, fj)) * 6.2831 + u_time * 0.35 * (mod(fj, 2.0) * 2.0 - 1.0);
+      float r = (0.034 + hash(vec2(seed, fj + 4.0)) * 0.02) * sc * breathe;
+      vec2 o = vec2(cos(ang) * 0.05, sin(ang) * 0.022) * sc;
+      vec2 q = sp - gc - o;
+      d += exp(-dot(q, q) / (r * r));
+    }
+    float body = smoothstep(0.3, 0.9, d + (fbm(sp * 14.0 + u_time * 0.1) - 0.5) * 0.35);
+    puff = max(puff, body * sin(f * 3.14159));
+  }
+  if (puff > 0.05 && puff >= n) {
+    g_alt = 1.0;
+    // 实心的泡沫：每格在 ° o O 之间慢慢换
+    float grain = hash(c + floor(u_time * 0.7 + hash(c) * 4.0));
+    return clamp(puff * (0.62 + 0.38 * grain), 0.0, 1.0);
+  }
+  return clamp(n, 0.0, 1.0);
 }
 
 // ===========================================================================
@@ -781,7 +760,7 @@ float outsideAtten(int eff) {
   if (eff == 5 || eff == 7) return 1.0;
   if (eff == 1 || eff == 2 || eff == 3 || eff == 4 || eff == 8 || eff == 10) return 0.9;
   if (eff == 9) return 0.95;
-  if (eff == 6) return 0.9;
+  if (eff == 6) return 0.72;
   return 0.6;
 }
 
@@ -796,6 +775,7 @@ vec4 sampleScene(int eff, float speed, float maskLayer, vec3 place, vec2 uv) {
   g_grid = u_res / u_cellPx;
   g_acc = 0.0;
   g_fill = 0.0;
+  g_alt = 0.0;
   float lum = scene(eff, euv, t);
 
   float m = 0.0;
@@ -890,9 +870,12 @@ void main() {
 
   vec4 A = vec4(0.0);
   vec4 B = vec4(0.0);
-  if (s < 0.999) A = sampleScene(u_effA, u_speedA, u_maskA, u_placeA, suv);
-  if (s > 0.001) B = sampleScene(u_effB, u_speedB, u_maskB, u_placeB, suv);
+  float altA = 0.0;
+  float altB = 0.0;
+  if (s < 0.999) { A = sampleScene(u_effA, u_speedA, u_maskA, u_placeA, suv); altA = g_alt; }
+  if (s > 0.001) { B = sampleScene(u_effB, u_speedB, u_maskB, u_placeB, suv); altB = g_alt; }
   vec4 R = mix(A, B, s);
+  float alt = s < 0.5 ? altA : altB;
   float lit = R.x;
 
   // ---- 光标透镜：鼠标附近微亮 ----
@@ -927,7 +910,7 @@ void main() {
   }
 
   o0 = vec4(lit, R.y, s, heat);
-  o1 = vec4(R.z, R.w, 0.0, 1.0);
+  o1 = vec4(R.z, R.w, alt, 1.0);
 }`;
 
 // ---------------------------------------------------------------------------
@@ -987,6 +970,7 @@ uniform float u_glowAmtB;
 uniform vec2 u_rowLenA;      // atlas 行号, 字符数
 uniform vec2 u_rowLenB;
 uniform vec2 u_rowLenScr;    // 乱码行
+uniform vec2 u_rowLenAlt;    // 泡泡行
 uniform float u_intro;       // 0..1 开场淡入
 
 ${COMMON}
@@ -1016,6 +1000,11 @@ void main() {
   // ---- 字形选择 ----
   vec2 rl = s < 0.5 ? u_rowLenA : u_rowLenB;
   float gi = floor(lit * (rl.y - 1.0) + 0.5);
+  if (S.b > 0.5) {
+    // 泡泡行：mask 外的压暗会把亮度压低，这里放大回来，让实心处落在 o / O
+    rl = u_rowLenAlt;
+    gi = floor(clamp(lit * 1.4, 0.0, 1.0) * (rl.y - 1.0) + 0.5);
+  }
   float tick = floor(u_time * 14.0);
   float hs = hash(cell + tick * 0.37);
   if (hs < heat * 0.8 && lit > 0.04) {
