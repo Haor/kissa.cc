@@ -4,72 +4,80 @@ import { create } from "zustand";
 import { SLIDES, SLIDE_INDEX_BY_ID } from "./slides";
 
 /**
- * Carousel state + 输入聚合。
+ * Carousel 状态。
  *
- * 单一动作：
+ * 转场动画不再由 store 推进：字符场的 morph 由 GlyphEngine 自己计时，
+ * DOM 文案的进出场由 CSS transition（data-active）驱动。store 只管
+ * 「现在是哪一屏」+ 翻页冷却，所以每次翻页只触发一次 React 渲染。
+ *
  *   - goto(delta)        相对翻页 (+1/-1)
  *   - gotoIndex(n)       绝对跳转
- *   - setTransition(p)   由 Carousel 的 RAF 驱动 0..1 进度
- *   - finishTransition() transition 结束、解开 cooldown
+ *   - busy / pending     冷却期间的输入只保留最后一次，冷却结束立即执行
  */
 
-const COOLDOWN_MS = 720; // 转场 600ms + 120ms 缓冲
+const COOLDOWN_MS = 640;
 
 export type CarouselState = {
   index: number;
-  /** 转场期间的"旧屏"index；稳态时 = index */
   prevIndex: number;
   /** 上一次翻页方向：-1 / 0 / +1 */
   direction: -1 | 0 | 1;
-  /** transition 进度 0..1；0 表示稳态，1 表示完成切换那一瞬间 */
-  transition: number;
-  /** 正在 transition；期间忽略新输入（但保留最后一次） */
   busy: boolean;
-  pending: number | null; // 等待中的目标 index（取最后一次）
+  pending: number | null;
+  /** 开场 loader 结束，DOM 开始入场 */
+  booted: boolean;
+  /** 全屏目录是否打开 */
+  menuOpen: boolean;
 };
 
 type CarouselActions = {
   goto: (delta: number) => void;
   gotoIndex: (i: number) => void;
   gotoId: (id: string) => void;
-  setTransition: (p: number) => void;
-  finishTransition: () => void;
+  setBooted: () => void;
+  setMenu: (open: boolean) => void;
 };
 
 const last = SLIDES.length - 1;
 const clamp = (n: number) => Math.max(0, Math.min(last, n));
+let timer: ReturnType<typeof setTimeout> | null = null;
 
 export const useCarousel = create<CarouselState & CarouselActions>((set, get) => ({
   index: 0,
   prevIndex: 0,
   direction: 0,
-  transition: 0,
   busy: false,
   pending: null,
+  booted: false,
+  menuOpen: false,
 
   goto(delta) {
-    get().gotoIndex(get().index + delta);
+    const { pending, index } = get();
+    get().gotoIndex((pending ?? index) + delta);
   },
 
   gotoIndex(target) {
     const next = clamp(target);
     const state = get();
-    if (next === state.index && !state.busy) return;
     if (state.busy) {
-      // 在 transition 期间，只保存最后一次目标
-      set({ pending: next });
+      set({ pending: next === state.index ? null : next });
       return;
     }
     if (next === state.index) return;
-    const direction = next > state.index ? 1 : -1;
     set({
       index: next,
       prevIndex: state.index,
-      direction,
-      transition: 0,
+      direction: next > state.index ? 1 : -1,
       busy: true,
       pending: null,
     });
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      const { pending } = get();
+      set({ busy: false, pending: null });
+      if (pending !== null) get().gotoIndex(pending);
+    }, COOLDOWN_MS);
   },
 
   gotoId(id) {
@@ -77,18 +85,11 @@ export const useCarousel = create<CarouselState & CarouselActions>((set, get) =>
     if (typeof i === "number") get().gotoIndex(i);
   },
 
-  setTransition(p) {
-    set({ transition: Math.max(0, Math.min(1, p)) });
+  setBooted() {
+    set({ booted: true });
   },
 
-  finishTransition() {
-    const { pending, index } = get();
-    set({ transition: 0, busy: false, direction: 0, prevIndex: index });
-    if (pending !== null) {
-      // 立即触发挂起的目标
-      setTimeout(() => get().gotoIndex(pending), 0);
-    }
+  setMenu(open) {
+    set({ menuOpen: open });
   },
 }));
-
-export { COOLDOWN_MS };

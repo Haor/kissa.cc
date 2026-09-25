@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import type { Slide } from "@/lib/slides";
+import { useState, type CSSProperties } from "react";
+import type { Slide, LinkItem } from "@/lib/slides";
 import { profile } from "@/lib/data";
 import { THEMES } from "@/lib/theme";
+import { useCarousel } from "@/lib/use-carousel";
 import { ContactIcon, type IconName } from "./ContactIcon";
+import { Magnetic, Scramble, Words } from "./Kinetic";
 
 const CONTACT_ICON_MAP: Record<string, IconName> = {
   email: "mail",
@@ -14,331 +16,326 @@ const CONTACT_ICON_MAP: Record<string, IconName> = {
   back: "back",
 };
 
+export type SlidePos = "before" | "active" | "after";
+
 type Props = {
   slide: Slide;
   index: number;
-  total: number;
+  pos: SlidePos;
 };
 
-export function SlideShell({ slide, index, total }: Props) {
+const pad = (n: number) => String(n).padStart(2, "0");
+const isExternal = (href: string) => href.startsWith("http");
+const extProps = (href: string) =>
+  isExternal(href) ? { target: "_blank", rel: "noreferrer noopener" } : {};
+/** site.json 里的 CTA 文案自带 "→"，统一换成我们自己的箭头 */
+const ctaText = (label: string) => label.replace(/\s*[→↗]\s*$/, "");
+
+/** 进场 stagger：d = 序号，base = 起始延迟 */
+const d = (i: number): CSSProperties => ({ "--d": i }) as CSSProperties;
+
+export function SlideShell({ slide, index, pos }: Props) {
   const theme = THEMES[slide.theme];
+  const booted = useCarousel((s) => s.booted);
+  const live = pos === "active" && booted;
+  const right = slide.text === "right";
 
   return (
     <section
-      className="slide-root relative h-full w-full overflow-hidden"
-      style={
-        {
-          "--bg": theme.bg,
-          "--fg": theme.fg,
-          "--accent": theme.accent,
-        } as React.CSSProperties
-      }
+      className="slide absolute inset-0"
+      data-pos={pos}
+      data-slide={slide.id}
+      style={{ "--accent": theme.glyph } as CSSProperties}
+      aria-hidden={pos !== "active"}
+      inert={pos !== "active"}
       aria-labelledby={`slide-${slide.id}-title`}
     >
-      <h1 id={`slide-${slide.id}-title`} className="sr-only">
-        {slide.label}
-      </h1>
+      <h2 id={`slide-${slide.id}-title`} className="sr-only">
+        {pad(index)} {slide.label}
+      </h2>
 
-      {/* ASCII 背景由顶层 <SceneStage /> 单实例渲染，这里不再各自起 GL context。 */}
-
-      {/* 柔和的顶/底蒙层：让 chrome 和文案文字更易读，
-       *  不挡视觉中心的 ASCII */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-[5] h-32"
-        style={{
-          background: `linear-gradient(to bottom, ${theme.bg}f2 0%, ${theme.bg}99 45%, transparent 100%)`,
-        }}
-      />
-      {/* 底部 overlay 柔化：shader 端已经接管"阅读带"亮度衰减，CSS 这里只做
-       *  最后一点点贴底色加深，保证 chrome 文字与底部装饰仍然可读。 */}
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-[5]"
-        style={{
-          // 含密集列表的屏（hardware / links）给更高更深的渐变；其它屏保持原 h-40 高度
-          height: slide.id === "hardware" || slide.id === "links" ? "60%" : "10rem",
-          background:
-            slide.id === "hardware" || slide.id === "links"
-              ? `linear-gradient(to top, ${theme.bg}f8 0%, ${theme.bg}cc 35%, ${theme.bg}66 65%, transparent 100%)`
-              : `linear-gradient(to top, ${theme.bg}f2 0%, ${theme.bg}80 50%, transparent 100%)`,
-        }}
-      />
+        data-scrim=""
+        className={`ink-shadow absolute inset-x-[var(--gutter)] ${
+          right
+            ? "bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-auto md:left-auto md:right-[var(--gutter)] md:top-1/2 md:w-[min(44vw,600px)] md:-translate-y-1/2"
+            : "bottom-[calc(76px+env(safe-area-inset-bottom))] md:right-auto md:bottom-[clamp(104px,15vh,160px)] md:w-[min(48vw,700px)]"
+        }`}
+      >
+        <SlideContent slide={slide} index={index} live={live} />
+      </div>
 
-      <SlideChrome slide={slide} index={index} total={total} />
-      <SlideContent slide={slide} />
+      <FigureCaption slide={slide} />
     </section>
   );
 }
 
-function SlideChrome({
-  slide,
-  index,
-  total,
-}: {
-  slide: Slide;
-  index: number;
-  total: number;
-}) {
-  return (
-    <>
-      <div className="text-soft-shadow pointer-events-none absolute left-6 top-6 z-20 font-mono text-[11px] uppercase tracking-[0.32em] opacity-70">
-        <span>{String(index).padStart(2, "0")}</span>
-        <span className="mx-1 opacity-60">/</span>
-        <span className="opacity-70">{String(total - 1).padStart(2, "0")}</span>
-        <span className="mx-3 opacity-40">·</span>
-        <span className="opacity-90">{slide.label}</span>
-      </div>
-      <div className="text-soft-shadow pointer-events-none absolute right-6 top-6 z-20 hidden font-mono text-[10px] uppercase tracking-[0.3em] opacity-55 sm:block">
-        kissa.cc
-      </div>
-    </>
-  );
-}
-
-function SlideContent({ slide }: { slide: Slide }) {
+function SlideContent({ slide, index, live }: { slide: Slide; index: number; live: boolean }) {
   switch (slide.id) {
     case "cover":
-      return <CoverContent slide={slide} />;
+      return <CoverContent slide={slide} live={live} />;
     case "about":
-      return <AboutContent slide={slide} />;
+      return <AboutContent slide={slide} index={index} />;
     case "hardware":
-      return <HardwareContent slide={slide} />;
+      return <HardwareContent slide={slide} index={index} live={live} />;
     case "links":
-      return <LinksContent slide={slide} />;
+      return <LinksContent slide={slide} index={index} />;
     case "contact":
-      return <ContactContent slide={slide} />;
+      return <ContactContent slide={slide} index={index} />;
     default:
-      return <BrandContent slide={slide} />;
+      return <BrandContent slide={slide} index={index} live={live} />;
   }
 }
 
-// ---------------- Templates ----------------
+// ---------------------------------------------------------------------------
+// 公共件
+// ---------------------------------------------------------------------------
 
-function CoverContent({ slide }: { slide: Slide }) {
+function Eyebrow({ index, text, i = 0 }: { index: number; text: string; i?: number }) {
   return (
-    <div className="text-soft-shadow pointer-events-none relative z-10 flex h-full w-full flex-col font-mono">
-      <div className="mt-auto px-8 pb-28 pl-10">
-        <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.5em] opacity-60">
-          <span
-            className="inline-block h-px w-8"
-            style={{ background: "currentColor" }}
-            aria-hidden="true"
+    <div className="tag rv flex items-center gap-3" style={d(i)}>
+      <span className="inline-block size-[7px]" style={{ background: "var(--accent)" }} />
+      <span className="opacity-90">{pad(index)}</span>
+      <span className="inline-block h-px w-6 bg-current opacity-40" />
+      <span className="opacity-70">{text}</span>
+    </div>
+  );
+}
+
+function Display({
+  text,
+  size = "md",
+  start = 1,
+}: {
+  text: string;
+  size?: "xl" | "md";
+  start?: number;
+}) {
+  return (
+    <p
+      className={`font-serif font-normal leading-[0.92] tracking-[-0.012em] ${
+        size === "xl"
+          ? "text-[clamp(64px,10.5vw,196px)]"
+          : "text-[clamp(46px,6.4vw,118px)]"
+      }`}
+    >
+      <Words text={text} start={start} />
+    </p>
+  );
+}
+
+function Cta({ href, label, i }: { href: string; label: string; i: number }) {
+  return (
+    <div className="rv mt-9" style={d(i)}>
+      <Magnetic strength={0.22}>
+        <a href={href} {...extProps(href)} className="cta" data-cursor={isExternal(href) ? "open" : "mail"}>
+          <span>{ctaText(label)}</span>
+          <span className="arrow" aria-hidden="true">
+            ↗
+          </span>
+        </a>
+      </Magnetic>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 模板
+// ---------------------------------------------------------------------------
+
+function CoverContent({ slide, live }: { slide: Slide; live: boolean }) {
+  return (
+    <div>
+      <div className="tag rv flex items-center gap-3" style={d(0)}>
+        <span className="inline-block size-[7px]" style={{ background: "var(--accent)" }} />
+        <span className="opacity-70">{slide.kicker}</span>
+      </div>
+      <div className="mt-5 -ml-[0.04em]">
+        <Display text={slide.sentence ?? ""} size="xl" start={1} />
+      </div>
+      <div className="rule mt-8 max-w-[560px]" style={d(4)} />
+      <div className="mt-5 flex max-w-[560px] flex-wrap items-baseline justify-between gap-x-8 gap-y-4">
+        <p className="rv text-[14px] tracking-[0.04em]" style={d(5)}>
+          {profile.name} <span className="opacity-40">/</span> {profile.aka}
+        </p>
+        <div className="tag rv flex items-center gap-3 opacity-60" style={d(6)}>
+          <span className="nudge inline-block">→</span>
+          {/* 触屏没有键盘和滚轮 */}
+          <Scramble text="scroll · drag · 0–9" active={live} delay={1100} className="hidden md:inline" />
+          <Scramble text="swipe" active={live} delay={1100} className="md:hidden" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AboutContent({ slide, index }: { slide: Slide; index: number }) {
+  const [engineer, dreamer] = (slide.sentence ?? "").split("·").map((s) => s.trim());
+  return (
+    <div>
+      <Eyebrow index={index} text={slide.eyebrow ?? slide.label} />
+      <p className="rv mt-7 text-[clamp(22px,2.6vw,40px)] font-medium uppercase leading-none tracking-[0.14em]" style={d(1)}>
+        {engineer}
+      </p>
+      {dreamer && (
+        <div className="mt-2">
+          <Display text={`& ${dreamer.toLowerCase()}.`} start={2} />
+        </div>
+      )}
+      {slide.intent && (
+        <p className="rv mt-8 max-w-[44ch] text-[13.5px] leading-[1.75] opacity-75" style={d(5)}>
+          {slide.intent}
+        </p>
+      )}
+      {slide.cta && <Cta href={slide.cta.href} label={slide.cta.label} i={6} />}
+    </div>
+  );
+}
+
+function BrandContent({ slide, index, live }: { slide: Slide; index: number; live: boolean }) {
+  return (
+    <div>
+      <Eyebrow index={index} text={slide.eyebrow ?? slide.label} />
+      <div className="mt-6">
+        <Display text={slide.intent ?? ""} start={1} />
+      </div>
+      {slide.handle && (
+        <div className="rv mt-7 flex items-baseline gap-4" style={d(4)}>
+          <span className="tag opacity-40">handle</span>
+          <Scramble
+            text={slide.handle}
+            active={live}
+            delay={620}
+            className="text-[16px] tracking-[0.04em]"
           />
-          <span>{slide.kicker ?? `${profile.name.toLowerCase()} · index`}</span>
         </div>
-        <div className="mt-3 text-[2.4rem] font-medium leading-[1.05] tracking-tight md:text-[3.4rem]">
-          {slide.sentence}
-        </div>
-        <div className="mt-4 text-sm opacity-80">
-          {profile.name} <span className="opacity-55">·</span> {profile.aka}
-        </div>
-        <div className="mt-1 text-xs opacity-60">{profile.title}</div>
-        <div className="mt-6 flex items-center gap-3 text-[10px] uppercase tracking-[0.3em] opacity-70">
-          <span>→</span>
-          <span>slide</span>
-          <span className="opacity-40">·</span>
-          <span>0–9</span>
-          <span>jump</span>
-        </div>
-      </div>
+      )}
+      {slide.cta && <Cta href={slide.cta.href} label={slide.cta.label} i={5} />}
     </div>
   );
 }
 
-function AboutContent({ slide }: { slide: Slide }) {
+function HardwareContent({ slide, index, live }: { slide: Slide; index: number; live: boolean }) {
+  const rows = slide.hardware ?? [];
   return (
-    <div className="text-soft-shadow pointer-events-none relative z-10 flex h-full w-full items-end justify-center px-8 pb-24 font-mono">
-      <div className="pointer-events-auto max-w-lg text-center">
-        <div
-          className="text-[11px] uppercase tracking-[0.45em] opacity-70"
-          style={{ color: "var(--fg)" }}
-        >
-          who
-        </div>
-        <p
-          className="mt-3 text-2xl font-medium md:text-3xl"
-          style={{ color: "var(--fg)" }}
-        >
-          {slide.sentence}
-        </p>
-        <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed opacity-80">
-          {slide.intent}
-        </p>
-        {slide.cta && (
-          <a
-            href={slide.cta.href}
-            className="mt-6 inline-block border-b border-current/80 pb-1 text-sm opacity-90 transition-opacity hover:opacity-100"
+    <div>
+      <Eyebrow index={index} text={slide.eyebrow ?? slide.label} />
+      <div className="mt-6">
+        <Display text={slide.sentence ?? ""} start={1} />
+      </div>
+      <div className="rule mt-9" style={d(3)} />
+      <dl className="mt-1">
+        {rows.map((row, i) => (
+          <div
+            key={row.group}
+            className="rv grid grid-cols-[2.2em_7.5em_1fr] items-baseline gap-x-3 border-b border-current/10 py-[9px] text-[13px]"
+            style={d(4 + i)}
           >
-            {slide.cta.label}
-          </a>
-        )}
-      </div>
+            <span className="tag opacity-30">{pad(i + 1)}</span>
+            <dt className="tag opacity-55">{row.group}</dt>
+            <dd className="truncate opacity-95">
+              <Scramble text={row.value} active={live} delay={560 + i * 70} />
+            </dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
 
-function BrandContent({ slide }: { slide: Slide }) {
+function LinkRow({ it, n }: { it: LinkItem; n: number }) {
+  const placeholder = it.href === "#";
   return (
-    <div className="text-soft-shadow pointer-events-none relative z-10 flex h-full w-full items-end justify-center px-8 pb-24 font-mono">
-      <div className="pointer-events-auto max-w-md text-center">
-        <div
-          className="text-[11px] uppercase tracking-[0.45em] opacity-70"
-          style={{ color: "var(--fg)" }}
-        >
-          {slide.handle}
-        </div>
-        <p
-          className="mt-3 text-lg font-medium md:text-xl"
-          style={{ color: "var(--fg)" }}
-        >
-          {slide.intent}
-        </p>
-        {slide.cta && (
-          <a
-            href={slide.cta.href}
-            target={slide.cta.href.startsWith("http") ? "_blank" : undefined}
-            rel={slide.cta.href.startsWith("http") ? "noreferrer noopener" : undefined}
-            className="mt-6 inline-block border-b border-current/80 pb-1 text-sm opacity-90 transition-opacity hover:opacity-100"
-          >
-            {slide.cta.label}
-          </a>
+    <li>
+      <a
+        href={it.href}
+        {...extProps(it.href)}
+        aria-disabled={placeholder || undefined}
+        data-cursor="open"
+        className={`row grid grid-cols-[2.2em_1fr_auto_1.2em] items-baseline gap-x-3 py-[7px] ${
+          placeholder ? "pointer-events-none opacity-35" : ""
+        }`}
+      >
+        <span className="tag opacity-30">{pad(n)}</span>
+        <span className="shift truncate text-[14px]">{it.label}</span>
+        {it.note ? (
+          <span className="font-serif hidden text-[17px] leading-none opacity-60 sm:inline">{it.note}</span>
+        ) : (
+          <span />
         )}
-      </div>
-    </div>
+        <span className="go text-right text-[13px]" aria-hidden="true">
+          ↗
+        </span>
+      </a>
+    </li>
   );
 }
 
-function HardwareContent({ slide }: { slide: Slide }) {
-  return (
-    <div className="text-soft-shadow pointer-events-none relative z-10 flex h-full w-full items-end justify-center px-8 pb-20 font-mono">
-      <div className="pointer-events-auto w-full max-w-2xl text-center">
-        <div
-          className="text-[11px] uppercase tracking-[0.45em] opacity-70"
-          style={{ color: "var(--fg)" }}
-        >
-          rig
-        </div>
-        <p
-          className="mt-3 text-2xl font-medium md:text-3xl"
-          style={{ color: "var(--fg)" }}
-        >
-          {slide.sentence}
-        </p>
-        {slide.hardware && (
-          <dl className="mx-auto mt-5 grid max-w-xl grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-left">
-            {slide.hardware.map((row) => (
-              <div key={row.group} className="contents">
-                <dt className="text-right text-[10px] uppercase tracking-[0.35em] opacity-60">
-                  {row.group}
-                </dt>
-                <dd className="text-sm opacity-90">{row.value}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function LinksContent({ slide }: { slide: Slide }) {
+function LinksContent({ slide, index }: { slide: Slide; index: number }) {
   const groups: { key: keyof NonNullable<Slide["links"]>; label: string }[] = [
     { key: "projects", label: "projects" },
     { key: "tools", label: "tools" },
     { key: "friends", label: "friends" },
   ];
+  let n = 0;
+  let k = 3;
   return (
-    <div className="text-soft-shadow pointer-events-none relative z-10 flex h-full w-full items-end justify-center px-8 pb-20 font-mono">
-      <div className="pointer-events-auto w-full max-w-3xl text-center">
-        <div
-          className="text-[11px] uppercase tracking-[0.45em] opacity-70"
-          style={{ color: "var(--fg)" }}
-        >
-          out there
-        </div>
-        <p
-          className="mt-3 text-2xl font-medium md:text-3xl"
-          style={{ color: "var(--fg)" }}
-        >
-          {slide.sentence}
-        </p>
-        {slide.links && (
-          <div className="mt-6 grid grid-cols-1 gap-x-10 gap-y-6 text-left sm:grid-cols-3">
-            {groups.map((g) => {
-              const items = slide.links?.[g.key] ?? [];
-              return (
-                <div key={g.key}>
-                  <div className="text-[10px] uppercase tracking-[0.4em] opacity-55">
-                    {g.label}
-                  </div>
-                  <ul className="mt-3 space-y-2">
-                    {items.map((it, i) => {
-                      const isPlaceholder = it.href === "#";
-                      return (
-                        <li key={`${it.label}-${i}`} className="leading-tight">
-                          <a
-                            href={it.href}
-                            target={
-                              it.href.startsWith("http") ? "_blank" : undefined
-                            }
-                            rel={
-                              it.href.startsWith("http")
-                                ? "noreferrer noopener"
-                                : undefined
-                            }
-                            aria-disabled={isPlaceholder || undefined}
-                            className={`block whitespace-nowrap text-sm transition-opacity ${
-                              isPlaceholder
-                                ? "opacity-35"
-                                : "opacity-85 hover:opacity-100"
-                            }`}
-                          >
-                            {it.label}
-                          </a>
-                          {it.note && (
-                            <div className="mt-0.5 whitespace-nowrap text-[10px] opacity-55">
-                              {it.note}
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
-        )}
+    <div>
+      <Eyebrow index={index} text={slide.eyebrow ?? slide.label} />
+      <div className="mt-6">
+        <Display text={slide.sentence ?? ""} start={1} />
+      </div>
+      <div className="mt-7 space-y-5">
+        {groups.map((g) => {
+          const items = slide.links?.[g.key] ?? [];
+          if (!items.length) return null;
+          const gi = k++;
+          return (
+            <div key={g.key}>
+              <div className="rv flex items-center gap-3" style={d(gi)}>
+                <span className="tag opacity-45">{g.label}</span>
+                <span className="tag opacity-25">{pad(items.length)}</span>
+              </div>
+              <div className="rule mt-2" style={d(gi)} />
+              <ul className="rv mt-1" style={d(gi + 1)}>
+                {items.map((it) => (
+                  <LinkRow key={it.label} it={it} n={++n} />
+                ))}
+              </ul>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function ContactContent({ slide }: { slide: Slide }) {
+function ContactContent({ slide, index }: { slide: Slide; index: number }) {
+  const contacts = slide.contacts ?? [];
+  const main = contacts.filter((c) => c.label !== "back");
+  const back = contacts.find((c) => c.label === "back");
   return (
-    <div className="text-soft-shadow pointer-events-none relative z-10 flex h-full w-full items-end justify-center px-8 pb-24 font-mono">
-      <div className="pointer-events-auto max-w-xl text-center">
-        <div
-          className="text-[11px] uppercase tracking-[0.45em] opacity-70"
-          style={{ color: "var(--fg)" }}
-        >
-          end of transmission
-        </div>
-        <p
-          className="mt-3 text-2xl font-medium md:text-3xl"
-          style={{ color: "var(--fg)" }}
-        >
-          {slide.sentence}
-        </p>
-        {slide.contacts && (
-          <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-7 gap-y-3 text-sm">
-            {slide.contacts.map((c) => (
-              <ContactRow key={c.label} contact={c} />
-            ))}
-          </ul>
+    <div>
+      <Eyebrow index={index} text={slide.eyebrow ?? slide.label} />
+      <div className="mt-6">
+        <Display text={slide.sentence ?? ""} start={1} />
+      </div>
+      <div className="rule mt-9" style={d(4)} />
+      <ul>
+        {main.map((c, i) => (
+          <ContactRow key={c.label} contact={c} i={5 + i} />
+        ))}
+      </ul>
+      <div className="rv mt-8 flex items-center justify-between" style={d(10)}>
+        {back && (
+          <a href={back.href} className="tag group inline-flex items-center gap-2.5 opacity-60 transition-opacity hover:opacity-100">
+            <ContactIcon name="back" size={14} className="transition-transform duration-700 group-hover:-rotate-[200deg]" />
+            <span>
+              back <span className="opacity-50">·</span> {back.value}
+            </span>
+          </a>
         )}
-        <div className="mt-6 text-[10px] uppercase tracking-[0.35em] opacity-50">
-          {profile.handle}
-        </div>
+        <span className="tag opacity-35">{profile.handle}</span>
       </div>
     </div>
   );
@@ -346,20 +343,20 @@ function ContactContent({ slide }: { slide: Slide }) {
 
 function ContactRow({
   contact: c,
+  i,
 }: {
   contact: NonNullable<Slide["contacts"]>[number];
+  i: number;
 }) {
   const icon = CONTACT_ICON_MAP[c.label];
   const [copied, setCopied] = useState(false);
   const isCopy = c.action === "copy";
 
-  const handleCopy = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
+  const handleCopy = async () => {
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(c.href);
       } else {
-        // 旧浏览器降级：临时 textarea + execCommand
         const ta = document.createElement("textarea");
         ta.value = c.href;
         ta.style.position = "fixed";
@@ -370,59 +367,71 @@ function ContactRow({
         document.body.removeChild(ta);
       }
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1400);
+      window.setTimeout(() => setCopied(false), 1600);
     } catch {
       /* noop */
     }
   };
 
-  if (isCopy) {
-    return (
-      <li>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="group inline-flex items-center gap-2 opacity-85 transition-opacity hover:opacity-100"
-          aria-label={`copy ${c.label} ${c.href}`}
-        >
-          {icon && (
-            <ContactIcon
-              name={copied ? "copy" : icon}
-              className="opacity-80 transition-opacity group-hover:opacity-100"
-            />
-          )}
-          <span className="text-[10px] uppercase tracking-[0.32em] opacity-65">
-            {c.label}
-          </span>
-          <span className="relative border-b border-dashed border-current/60 pb-0.5 transition-colors group-hover:border-current">
-            {copied ? "copied" : c.value}
-          </span>
-        </button>
-      </li>
-    );
-  }
+  const inner = (
+    <>
+      <span className="opacity-60">{icon && <ContactIcon name={copied ? "copy" : icon} size={15} />}</span>
+      <span className="tag opacity-50">{c.label}</span>
+      <span className="shift truncate text-[15px]">{copied ? "copied to clipboard" : c.value}</span>
+      <span className="go tag text-right" aria-hidden="true">
+        {isCopy ? (copied ? "✓" : "copy") : "↗"}
+      </span>
+    </>
+  );
+  const cls =
+    "row grid w-full grid-cols-[1.6em_6.5em_1fr_auto] items-center gap-x-3 border-b border-current/10 py-[13px] text-left";
 
   return (
-    <li>
-      <a
-        href={c.href}
-        target={c.href.startsWith("http") ? "_blank" : undefined}
-        rel={c.href.startsWith("http") ? "noreferrer noopener" : undefined}
-        className="group inline-flex items-center gap-2 opacity-85 transition-opacity hover:opacity-100"
-      >
-        {icon && (
-          <ContactIcon
-            name={icon}
-            className="opacity-80 transition-opacity group-hover:opacity-100"
-          />
-        )}
-        <span className="text-[10px] uppercase tracking-[0.32em] opacity-65">
-          {c.label}
-        </span>
-        <span className="border-b border-current/60 pb-0.5 transition-colors group-hover:border-current">
-          {c.value}
-        </span>
-      </a>
+    <li className="rv" style={d(i)}>
+      {isCopy ? (
+        <button type="button" onClick={handleCopy} className={cls} data-cursor="copy" aria-label={`copy ${c.label} ${c.href}`}>
+          {inner}
+        </button>
+      ) : (
+        <a href={c.href} {...extProps(c.href)} className={cls} data-cursor={c.label === "email" ? "mail" : "open"}>
+          {inner}
+        </a>
+      )}
     </li>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Figure 注释：像展签一样贴在 figure 下沿
+// ---------------------------------------------------------------------------
+
+function FigureCaption({ slide }: { slide: Slide }) {
+  const note = slide.figureNote;
+  if (!note) return null;
+  const right = slide.text === "right";
+  return (
+    <figure
+      className={`ink-shadow pointer-events-none absolute top-[76px] hidden text-right md:top-auto md:block md:bottom-[clamp(96px,13vh,140px)] ${
+        right ? "md:left-[calc(var(--gutter)+2px)] md:text-left" : "right-[var(--gutter)]"
+      }`}
+    >
+      <div className={`tag rv flex items-center gap-3 opacity-45 ${right ? "" : "justify-end"}`} style={d(3)}>
+        <span>fig.</span>
+        <span className="inline-block h-px w-5 bg-current" />
+        <span>{note.fig}</span>
+      </div>
+      <figcaption className={`rv mt-3 flex items-baseline gap-3 ${right ? "" : "justify-end"}`} style={d(4)}>
+        {note.mark && <span className="text-[26px] leading-none">{note.mark}</span>}
+        <span className="font-serif text-[19px] leading-none opacity-80">
+          {note.reading ? (
+            <>
+              {note.reading} <span className="opacity-50">—</span> {note.gloss}
+            </>
+          ) : (
+            note.gloss
+          )}
+        </span>
+      </figcaption>
+    </figure>
   );
 }

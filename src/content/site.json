@@ -13,12 +13,15 @@
 
   "slides": {
     "cover": {
-      "kicker": "an index of selves · 00",
-      "sentence": "as i dreamed."
+      "kicker": "an index of selves",
+      "sentence": "as i dreamed.",
+      "figure": { "fig": "drift", "mark": "夢", "reading": "yume", "gloss": "dream" }
     },
 
     "about": {
+      "eyebrow": "who",
       "sentence": "Engineer · Daydreamer",
+      "figure": { "fig": "wiring", "mark": "私", "reading": "watashi", "gloss": "i, myself" },
       "intent": "based in Shenzhen — drifting between the physical and the virtual, making things mostly only I care about.",
       "cta": { "label": "Email me →", "href": "mailto:i@haor.cc" }
     },
@@ -26,12 +29,14 @@
     "x": {
       "handle": "@haor233_re",
       "intent": "thoughts in real time.",
+      "figure": { "fig": "timeline", "gloss": "a feed that never quite ends" },
       "cta": { "label": "Open X →", "href": "https://x.com/haor233_re" }
     },
 
     "instagram": {
       "handle": "@haor233",
       "intent": "frames i keep.",
+      "figure": { "fig": "film", "gloss": "one frame every three seconds" },
       "cta": {
         "label": "Open Instagram →",
         "href": "https://www.instagram.com/haor233/"
@@ -41,18 +46,21 @@
     "github": {
       "handle": "@Haor",
       "intent": "rarely committed.",
+      "figure": { "fig": "contributions", "gloss": "fifty-two weeks, mostly quiet" },
       "cta": { "label": "Open GitHub →", "href": "https://github.com/Haor" }
     },
 
     "huggingface": {
       "handle": "@haor",
       "intent": "models i tinker with.",
+      "figure": { "fig": "forward pass", "gloss": "six layers, one guess" },
       "cta": { "label": "Open HF →", "href": "https://huggingface.co/haor" }
     },
 
     "steam": {
       "handle": "haor233",
       "intent": "what i'm playing.",
+      "figure": { "fig": "attract mode", "gloss": "move the cursor to play" },
       "cta": {
         "label": "Open Steam →",
         "href": "https://steamcommunity.com/id/haor233/"
@@ -60,7 +68,9 @@
     },
 
     "hardware": {
+      "eyebrow": "rig",
       "sentence": "the machinery.",
+      "figure": { "fig": "sixteen cores", "mark": "機", "reading": "ki", "gloss": "machine" },
       "hardware": [
         { "group": "CPU", "value": "AMD Ryzen 9 9950X3D" },
         { "group": "GPU", "value": "NVIDIA RTX 5080" },
@@ -73,7 +83,9 @@
     },
 
     "links": {
+      "eyebrow": "out there",
       "sentence": "the web of mine.",
+      "figure": { "fig": "web", "mark": "網", "reading": "ami", "gloss": "a net: works, tools, friends" },
       "links": {
         "projects": [
           {
@@ -120,7 +132,9 @@
     },
 
     "contact": {
+      "eyebrow": "end of transmission",
       "sentence": "until we meet again",
+      "figure": { "fig": "red thread", "mark": "縁", "reading": "en", "gloss": "a bond, fated" },
       "contacts": [
         { "label": "email", "value": "i@haor.cc", "href": "mailto:i@haor.cc" },
         {

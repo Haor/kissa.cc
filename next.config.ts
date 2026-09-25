@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   output: "export",
   images: { unoptimized: true },
   trailingSlash: true,
+  // 左下角的 dev 徽标会压住底部计数器
+  devIndicators: false,
 };
 
 export default nextConfig;

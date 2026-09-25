@@ -2,151 +2,100 @@
 
 import { useEffect, useRef } from "react";
 import { SLIDES, SLIDE_INDEX_BY_ID } from "@/lib/slides";
+import { profile } from "@/lib/data";
 import { useCarousel } from "@/lib/use-carousel";
-import { SlideShell } from "./SlideShell";
-import { DotNav } from "./DotNav";
+import { glyphBus } from "@/lib/glyph/bus";
 import { SceneStage } from "./SceneStage";
+import { SlideShell, type SlidePos } from "./SlideShell";
+import { Hud } from "./Hud";
+import { IndexNav } from "./IndexNav";
+import { IndexMenu } from "./IndexMenu";
+import { Cursor } from "./Cursor";
+import { Intro } from "./Intro";
 
-function easeInOutExpo(t: number): number {
-  if (t === 0) return 0;
-  if (t === 1) return 1;
-  return t < 0.5
-    ? Math.pow(2, 20 * t - 10) / 2
-    : (2 - Math.pow(2, -20 * t + 10)) / 2;
-}
-
-const TRANSITION_MS = 700;
-const REDUCED_TRANSITION_MS = 200;
 const WHEEL_THRESHOLD = 60;
 const DRAG_THRESHOLD_RATIO = 0.18;
 
 /**
- * 全局 carousel 容器。
+ * 顶层编排。
  *
- * 架构（v3，单 stage）：
- *   - 背景层：单实例 <SceneStage />，所有 ASCII 渲染统一在这里
- *   - 内容层：N 个 <SlideShell /> 绝对叠放，只渲染 chrome + content + gradient
- *     每个 shell 用 opacity 跟 carousel transition 进度做 cross-fade，
- *     与 SceneStage 内部的"散开-重组"动画同步
- *   - 不再有 strip translate；翻页 = 字符散开重组 + 文字 cross-fade
+ *   SceneStage   单实例字符场（GlyphEngine，1 个 WebGL2 context）
+ *   SlideShell×N 纯 DOM 文案层，data-pos = before / active / after 驱动 CSS 进出场
+ *   Hud / IndexNav / IndexMenu / Cursor / Intro
  *
- * 这同时解决：
- *   - 性能：单 GL context，单 RAF（之前最多 2-3 个 GL stage 同时活跃）
- *   - "突然变一下"：GL context 不再每屏重建，atlas 预建好后切换零成本
- *   - 跨平台一致：DPR 计算只走一份逻辑
+ * 输入：wheel / pointer drag / keyboard / URL hash。
+ * 拖拽和触控板横扫在「提交」之前就会实时驱动字符场的 wipe 预览
+ * （glyphBus.gesture），松手没过阈值则回弹 —— 转场是可以被手「拉」出来的。
  */
 export function Carousel() {
-  const animRef = useRef<number | null>(null);
-  const dragRef = useRef<{
-    active: boolean;
-    startX: number;
-    deltaX: number;
-    width: number;
-    pointerId: number | null;
-  }>({ active: false, startX: 0, deltaX: 0, width: 0, pointerId: null });
-  const wheelRef = useRef<{
-    accum: number;
-    lastEvent: number;
-    /** busy 期间或刚翻完页后处于 "等用户重新发起手势" 状态 */
-    armed: boolean;
-  }>({ accum: 0, lastEvent: 0, armed: true });
-
+  const rootRef = useRef<HTMLDivElement>(null);
   const index = useCarousel((s) => s.index);
-  const prevIndex = useCarousel((s) => s.prevIndex);
-  const direction = useCarousel((s) => s.direction);
-  const busy = useCarousel((s) => s.busy);
-  const transition = useCarousel((s) => s.transition);
+  const booted = useCarousel((s) => s.booted);
+  const menuOpen = useCarousel((s) => s.menuOpen);
   const goto = useCarousel((s) => s.goto);
   const gotoIndex = useCarousel((s) => s.gotoIndex);
   const gotoId = useCarousel((s) => s.gotoId);
-  const setTransition = useCarousel((s) => s.setTransition);
-  const finishTransition = useCarousel((s) => s.finishTransition);
 
-  // -------- 缓动驱动：index 变化 → RAF 跑 700ms（仅推进 store.transition）----------
-  useEffect(() => {
-    if (direction === 0) {
-      setTransition(0);
-      return;
-    }
-    const prefersReduced =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const dur = prefersReduced ? REDUCED_TRANSITION_MS : TRANSITION_MS;
-    const start = performance.now();
-    const tick = (now: number) => {
-      const elapsed = now - start;
-      const p = Math.min(1, elapsed / dur);
-      const eased = easeInOutExpo(p);
-      setTransition(eased);
-      if (p < 1) {
-        animRef.current = requestAnimationFrame(tick);
-      } else {
-        animRef.current = null;
-        finishTransition();
-      }
-    };
-    animRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (animRef.current !== null) cancelAnimationFrame(animRef.current);
-    };
-  }, [index, direction, setTransition, finishTransition]);
+  // DOM 跟手位移：直接写 CSS 变量，不触发 React 渲染
+  const setDrag = (px: number) => {
+    rootRef.current?.style.setProperty("--drag", `${px.toFixed(1)}px`);
+  };
 
-  // -------- 输入：wheel ----------
+  // -------- 输入：wheel（含触控板横扫预览）----------
   useEffect(() => {
-    // Mac 触控板的惯性滚动（momentum）会在用户停手后持续 ~300-700ms 每帧
-    // 发一个 wheel event。早期实现用 "lastEvent 距离 > 250ms 才解锁"，但惯性
-    // 期间间隔永远 < 250ms，所以锁会一直挂着，必须移动光标打断惯性才能再翻。
-    //
-    // 新策略：
-    //   1. 翻页后 wheelRef.armed = false（缴械），并把 accum 清零
-    //   2. 等用户出现一次"明显静默" → 重新装弹 (armed = true)
-    //   3. 静默判定 = 至少 ~120ms 没收到 wheel event，比惯性的事件间隔大、
-    //      比正常用户两次手势的间隔小
-    //   4. 此外 store.busy 期间一律 accum=0 + 不响应（避免转场中累积）
+    // Mac 触控板惯性滚动会在停手后持续发 wheel event。翻页后进入「缴械」态，
+    // 等到一次 ≥120ms 的静默才重新装弹，避免一次手势翻好几页。
     const SILENCE_MS = 120;
-    let silenceTimer: number | null = null;
-    const armAfterSilence = () => {
-      if (silenceTimer !== null) window.clearTimeout(silenceTimer);
-      silenceTimer = window.setTimeout(() => {
-        wheelRef.current.armed = true;
-        wheelRef.current.accum = 0;
-        silenceTimer = null;
+    let accum = 0;
+    let armed = true;
+    let silence: number | null = null;
+
+    const settle = () => {
+      if (silence !== null) window.clearTimeout(silence);
+      silence = window.setTimeout(() => {
+        armed = true;
+        if (accum !== 0) {
+          accum = 0;
+          glyphBus.gesture(null, 0, 0);
+          setDrag(0);
+        }
+        silence = null;
       }, SILENCE_MS);
     };
 
     const onWheel = (e: WheelEvent) => {
+      if (useCarousel.getState().menuOpen) return;
       e.preventDefault();
       const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-      const now = performance.now();
-      wheelRef.current.lastEvent = now;
-
-      // 转场期间：所有 wheel 都被吞掉（无论是用户主动还是惯性），且不累计
-      if (useCarousel.getState().busy) {
-        wheelRef.current.accum = 0;
-        wheelRef.current.armed = false;
-        armAfterSilence();
+      const st = useCarousel.getState();
+      if (st.busy || !armed || !st.booted) {
+        armed = false;
+        accum = 0;
+        settle();
         return;
       }
-
-      // 缴械状态：等惯性散尽
-      if (!wheelRef.current.armed) {
-        armAfterSilence();
-        return;
-      }
-
-      wheelRef.current.accum += dx;
-      if (Math.abs(wheelRef.current.accum) >= WHEEL_THRESHOLD) {
-        const dir = wheelRef.current.accum > 0 ? 1 : -1;
-        wheelRef.current.accum = 0;
-        wheelRef.current.armed = false;
-        armAfterSilence();
+      accum += dx;
+      settle();
+      const dir = accum > 0 ? 1 : -1;
+      const target = st.index + dir;
+      const amount = Math.min(1, Math.abs(accum) / WHEEL_THRESHOLD);
+      if (Math.abs(accum) >= WHEEL_THRESHOLD) {
+        accum = 0;
+        armed = false;
+        setDrag(0);
         goto(dir);
+        glyphBus.gesture(null, 0, 0);
+        return;
+      }
+      if (target >= 0 && target < SLIDES.length) {
+        glyphBus.gesture(target, amount, amount * dir * 0.4);
+        setDrag(-amount * dir * 14);
       }
     };
     window.addEventListener("wheel", onWheel, { passive: false });
     return () => {
       window.removeEventListener("wheel", onWheel);
-      if (silenceTimer !== null) window.clearTimeout(silenceTimer);
+      if (silence !== null) window.clearTimeout(silence);
     };
   }, [goto]);
 
@@ -154,6 +103,12 @@ export function Carousel() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const st = useCarousel.getState();
+      if (e.key === "i" || e.key === "I") {
+        st.setMenu(!st.menuOpen);
+        return;
+      }
+      if (st.menuOpen) return;
       if (e.key === "ArrowRight" || e.key === "PageDown") {
         e.preventDefault();
         goto(1);
@@ -167,7 +122,6 @@ export function Carousel() {
         e.preventDefault();
         gotoIndex(SLIDES.length - 1);
       } else if (/^[0-9]$/.test(e.key)) {
-        // 0 → index 0 (cover), ..., 9 → index 9 (contact)。直接 1:1 映射
         const n = parseInt(e.key, 10);
         if (n < SLIDES.length) {
           e.preventDefault();
@@ -179,60 +133,68 @@ export function Carousel() {
     return () => window.removeEventListener("keydown", onKey);
   }, [goto, gotoIndex]);
 
-  // -------- 输入：pointer drag（只决定翻页方向，不做视觉平移）----------
+  // -------- 输入：pointer drag（跟手预览 + 过阈值提交）----------
   useEffect(() => {
-    const root = document.body;
+    const drag = { active: false, id: -1, x0: 0, y0: 0, dx: 0, w: 1, horizontal: false };
 
-    const onPointerDown = (e: PointerEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest("button, a, input, textarea, [data-no-drag]")) return;
-      if (busy) return;
-      dragRef.current.active = true;
-      dragRef.current.startX = e.clientX;
-      dragRef.current.deltaX = 0;
-      dragRef.current.width = window.innerWidth;
-      dragRef.current.pointerId = e.pointerId;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest("button, a, input, textarea, [data-no-drag]")) return;
+      const st = useCarousel.getState();
+      if (st.menuOpen || !st.booted || e.button !== 0) return;
+      Object.assign(drag, { active: true, id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, w: window.innerWidth, horizontal: false });
     };
-    const onPointerMove = (e: PointerEvent) => {
-      if (!dragRef.current.active) return;
-      if (e.pointerId !== dragRef.current.pointerId) return;
-      dragRef.current.deltaX = e.clientX - dragRef.current.startX;
-    };
-    const finishDrag = (e: PointerEvent) => {
-      if (!dragRef.current.active) return;
-      if (
-        dragRef.current.pointerId !== null &&
-        e.pointerId !== dragRef.current.pointerId
-      )
-        return;
-      const { deltaX, width } = dragRef.current;
-      const ratio = Math.abs(deltaX) / Math.max(1, width);
-      dragRef.current.active = false;
-      dragRef.current.pointerId = null;
-      if (ratio >= DRAG_THRESHOLD_RATIO) {
-        const dir = deltaX < 0 ? 1 : -1;
-        goto(dir);
+    const onMove = (e: PointerEvent) => {
+      if (!drag.active || e.pointerId !== drag.id) return;
+      drag.dx = e.clientX - drag.x0;
+      if (!drag.horizontal && Math.abs(drag.dx) > 8 && Math.abs(drag.dx) > Math.abs(e.clientY - drag.y0)) {
+        drag.horizontal = true;
       }
-      dragRef.current.deltaX = 0;
+      if (!drag.horizontal) return;
+      const st = useCarousel.getState();
+      const dir = drag.dx < 0 ? 1 : -1;
+      const target = st.index + dir;
+      const ratio = Math.abs(drag.dx) / drag.w;
+      const amount = Math.min(1, ratio / DRAG_THRESHOLD_RATIO);
+      if (!st.busy && target >= 0 && target < SLIDES.length) {
+        glyphBus.gesture(target, amount, amount * dir * 0.5);
+      }
+      // 端点处加阻尼
+      const edge = target < 0 || target >= SLIDES.length ? 0.25 : 0.6;
+      setDrag(drag.dx * 0.08 * edge * 2);
     };
-
-    root.addEventListener("pointerdown", onPointerDown);
-    root.addEventListener("pointermove", onPointerMove);
-    root.addEventListener("pointerup", finishDrag);
-    root.addEventListener("pointercancel", finishDrag);
+    const onUp = (e: PointerEvent) => {
+      if (!drag.active || e.pointerId !== drag.id) return;
+      drag.active = false;
+      const ratio = Math.abs(drag.dx) / drag.w;
+      setDrag(0);
+      if (drag.horizontal && ratio >= DRAG_THRESHOLD_RATIO) goto(drag.dx < 0 ? 1 : -1);
+      // 提交后引擎已进入 auto，这里只负责把位移归零；未提交则触发回弹
+      glyphBus.gesture(null, 0, 0);
+    };
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
     return () => {
-      root.removeEventListener("pointerdown", onPointerDown);
-      root.removeEventListener("pointermove", onPointerMove);
-      root.removeEventListener("pointerup", finishDrag);
-      root.removeEventListener("pointercancel", finishDrag);
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
     };
-  }, [busy, goto]);
+  }, [goto]);
 
   // -------- URL hash 双向同步 ----------
   useEffect(() => {
     const fromHash = () => {
       const id = window.location.hash.replace(/^#/, "");
-      if (id && id in SLIDE_INDEX_BY_ID) gotoId(id);
+      if (!id || !(id in SLIDE_INDEX_BY_ID)) return;
+      // 开场前直接落到目标屏（开场凝聚出的就是它），之后走正常翻页
+      if (!useCarousel.getState().booted) {
+        useCarousel.setState({ index: SLIDE_INDEX_BY_ID[id], prevIndex: SLIDE_INDEX_BY_ID[id] });
+      } else {
+        gotoId(id);
+      }
     };
     fromHash();
     window.addEventListener("hashchange", fromHash);
@@ -241,59 +203,70 @@ export function Carousel() {
 
   useEffect(() => {
     const id = SLIDES[index]?.id;
-    if (!id) return;
-    const current = window.location.hash.replace(/^#/, "");
-    if (current !== id) {
+    if (id && window.location.hash.replace(/^#/, "") !== id) {
       window.history.replaceState(null, "", `#${id}`);
     }
   }, [index]);
 
-  // -------- 内容层 opacity 计算 --------
-  // 转场前半段（progress 0..0.5）：旧屏 opacity 1→0
-  // 转场后半段（progress 0.5..1）：新屏 opacity 0→1
-  // 稳态：只有 active 屏 opacity = 1
-  const isTransitioning = busy && direction !== 0;
-  // 用 store 里实际存的 prevIndex，而非 index-direction（数字跳转时跨度可能 >1）
-  const outgoingIdx = isTransitioning ? prevIndex : -1;
-  const incomingIdx = index;
-  const opacityFor = (i: number): number => {
-    if (!isTransitioning) return i === incomingIdx ? 1 : 0;
-    if (i === outgoingIdx) return Math.max(0, 1 - transition * 2);
-    if (i === incomingIdx) return Math.max(0, (transition - 0.5) * 2);
-    return 0;
-  };
+  // -------- 阅读区 scrim：量出每一屏文案块的矩形，交给字符场压暗 ----------
+  // 一次量全部 10 屏（隐藏的屏 visibility:hidden 仍然参与布局），转场时引擎按
+  // 每个字符格的 wipe 进度在新旧两块之间切换。
+  useEffect(() => {
+    if (!booted) return;
+    glyphBus.scrimOn(!menuOpen);
+  }, [booted, menuOpen]);
+
+  useEffect(() => {
+    if (!booted) return;
+    const measure = () => {
+      const root = rootRef.current;
+      if (!root) return;
+      glyphBus.scrims(
+        SLIDES.map((s) => {
+          const el = root.querySelector<HTMLElement>(`[data-slide="${s.id}"] [data-scrim]`);
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return new DOMRect(r.left - 24, r.top - 24, r.width + 48, r.height + 48);
+        }),
+      );
+    };
+    measure();
+    document.fonts?.ready.then(measure).catch(() => {});
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [booted]);
+
+  const posOf = (i: number): SlidePos => (i === index ? "active" : i < index ? "before" : "after");
 
   return (
     <div
-      className="fixed inset-0 overflow-hidden bg-black"
+      ref={rootRef}
+      className="fixed inset-0 select-none overflow-hidden bg-ink"
+      data-booted={booted ? "true" : "false"}
+      data-menu={menuOpen ? "true" : "false"}
       style={{ touchAction: "pan-y" }}
     >
-      {/* 背景：单实例全屏 ASCII */}
+      <h1 className="sr-only">
+        {profile.name} · {profile.aka} — {profile.title}
+      </h1>
       <SceneStage />
-
-      {/* 内容：N 个 SlideShell 绝对叠放，opacity 跟 transition 同步 */}
-      {SLIDES.map((slide, i) => {
-        const op = opacityFor(i);
-        const visible = op > 0.001;
-        return (
-          <div
-            key={slide.id}
-            className="absolute inset-0"
-            style={{
-              opacity: op,
-              pointerEvents: i === incomingIdx && !isTransitioning ? "auto" : "none",
-              visibility: visible ? "visible" : "hidden",
-              zIndex: i === incomingIdx ? 2 : i === outgoingIdx ? 1 : 0,
-              transition: "none",
-            }}
-            aria-hidden={i === incomingIdx && !isTransitioning ? undefined : true}
-          >
-            <SlideShell slide={slide} index={i} total={SLIDES.length} />
-          </div>
-        );
-      })}
-
-      <DotNav />
+      <main
+        className="fade-on-menu absolute inset-0 z-10"
+        style={{
+          transform: "translate3d(var(--drag, 0px), 0, 0)",
+          // 这里的 inline transition 会覆盖 .fade-on-menu 的，所以一并写上
+          transition: "transform 0.45s var(--ease-out-expo), opacity 0.5s var(--ease-out-expo), filter 0.5s",
+        }}
+      >
+        {SLIDES.map((slide, i) => (
+          <SlideShell key={slide.id} slide={slide} index={i} pos={posOf(i)} />
+        ))}
+      </main>
+      <Hud />
+      <IndexNav />
+      <IndexMenu />
+      <Cursor />
+      <Intro />
     </div>
   );
 }

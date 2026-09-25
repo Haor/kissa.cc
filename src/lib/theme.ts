@@ -1,107 +1,39 @@
 /**
- * 每屏的主题色。背景在 `--bg`、主色（高亮 / 字符 / CTA）在 `--fg`，
- * 辅色（点缀 / 边线）在 `--accent`。也包含 RGB 三元组供 shader 使用。
+ * 每屏的色彩。整站只有一种纸色（DOM 文字），每屏换的是字符场：
+ *   ink   底色（极暗，带一点点该屏色相）
+ *   glyph 字符主色
+ *   glow  光晕 / 热点 / 转场乱码的描边色
+ * DOM 里 `--accent` = glyph，用于小方块、刻度、箭头这种点缀。
  */
 export type SlideTheme = {
-  bg: string;
-  fg: string;
-  accent: string;
-  /** 0-1 归一化 RGB，供 shader uniform */
-  fgRgb: [number, number, number];
-  accentRgb: [number, number, number];
-  bgRgb: [number, number, number];
+  ink: string;
+  glyph: string;
+  glow: string;
+  /** effect 点名要「描边」的字符用的颜色，默认同 glow（Contact 的红线用它） */
+  accent?: string;
+  /** 光晕强度乘子 */
+  glowAmt: number;
 };
 
-const t = (
-  bg: string,
-  fg: string,
-  accent: string,
-  bgRgb: [number, number, number],
-  fgRgb: [number, number, number],
-  accentRgb: [number, number, number]
-): SlideTheme => ({ bg, fg, accent, bgRgb, fgRgb, accentRgb });
+export const PAPER = "#ece6d8";
 
 export const THEMES = {
-  cover: t(
-    "#0a0a0c",
-    "#e8e6df",
-    "#a09a8a",
-    [0.04, 0.04, 0.05],
-    [0.91, 0.9, 0.87],
-    [0.63, 0.6, 0.54],
-  ),
-  about: t(
-    "#0e1124",
-    "#a3b8ff",
-    "#5a6db8",
-    [0.05, 0.07, 0.14],
-    [0.64, 0.72, 1.0],
-    [0.35, 0.43, 0.72],
-  ),
-  x: t(
-    "#0f1419",
-    "#1d9bf0",
-    "#71c8ff",
-    [0.06, 0.08, 0.1],
-    [0.11, 0.61, 0.94],
-    [0.44, 0.78, 1.0],
-  ),
-  instagram: t(
-    "#1a0d1a",
-    "#fd7e3a",
-    "#d2266b",
-    [0.1, 0.05, 0.1],
-    [0.99, 0.49, 0.23],
-    [0.82, 0.15, 0.42],
-  ),
-  github: t(
-    "#0d1117",
-    "#7ce38b",
-    "#3fb950",
-    [0.05, 0.07, 0.09],
-    [0.49, 0.89, 0.55],
-    [0.25, 0.73, 0.31],
-  ),
-  huggingface: t(
-    "#1a1611",
-    "#ffd21e",
-    "#ff9b1c",
-    [0.1, 0.09, 0.07],
-    [1.0, 0.82, 0.12],
-    [1.0, 0.61, 0.11],
-  ),
-  steam: t(
-    "#1b2838",
-    "#66c0f4",
-    "#c7d5e0",
-    [0.11, 0.16, 0.22],
-    [0.4, 0.75, 0.96],
-    [0.78, 0.84, 0.88],
-  ),
-  hardware: t(
-    "#0d1014",
-    "#9ec5ff",
-    "#5a8fd4",
-    [0.05, 0.06, 0.08],
-    [0.62, 0.77, 1.0],
-    [0.35, 0.56, 0.83],
-  ),
-  links: t(
-    "#0a0a12",
-    "#b8c7e0",
-    "#8a9bcc",
-    [0.04, 0.04, 0.07],
-    [0.72, 0.78, 0.88],
-    [0.54, 0.61, 0.80],
-  ),
-  contact: t(
-    "#050608",
-    "#e8e6df",
-    "#a09a8a",
-    [0.02, 0.02, 0.03],
-    [0.91, 0.9, 0.87],
-    [0.63, 0.6, 0.54],
-  ),
-} as const;
+  cover: { ink: "#09090a", glyph: "#ece6d8", glow: "#b8ab92", glowAmt: 0.9 },
+  about: { ink: "#08091a", glyph: "#aab8ff", glow: "#5d6be0", glowAmt: 1.1 },
+  x: { ink: "#070b10", glyph: "#3ea7f5", glow: "#8fd4ff", glowAmt: 1.1 },
+  instagram: { ink: "#10070f", glyph: "#ff8a4c", glow: "#e2327b", glowAmt: 1.35 },
+  github: { ink: "#060b08", glyph: "#7ce38b", glow: "#2ea043", glowAmt: 1.2 },
+  huggingface: { ink: "#0f0c06", glyph: "#ffd21e", glow: "#ff9d1c", glowAmt: 1.2 },
+  steam: { ink: "#08101a", glyph: "#66c0f4", glow: "#c7d5e0", glowAmt: 1.0 },
+  hardware: { ink: "#0d0905", glyph: "#ffb347", glow: "#ff7a1a", accent: "#ff5a2a", glowAmt: 1.25 },
+  links: { ink: "#050d0d", glyph: "#7fe3d2", glow: "#2fb5a8", glowAmt: 1.1 },
+  // 全站最后一屏：纸白之外只有一根朱红的线（赤い糸）
+  contact: { ink: "#08080a", glyph: "#ece6d8", glow: "#a89c85", accent: "#e8412c", glowAmt: 0.9 },
+} as const satisfies Record<string, SlideTheme>;
 
 export type ThemeKey = keyof typeof THEMES;
+
+export function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+}

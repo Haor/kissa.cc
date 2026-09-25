@@ -49,16 +49,19 @@
           "additionalProperties": false,
           "properties": {
             "kicker": { "type": "string" },
-            "sentence": { "type": "string" }
+            "sentence": { "type": "string" },
+            "figure": { "$ref": "#/definitions/figure" }
           }
         },
         "about": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "eyebrow": { "type": "string" },
             "sentence": { "type": "string" },
             "intent": { "type": "string" },
-            "cta": { "$ref": "#/definitions/link" }
+            "cta": { "$ref": "#/definitions/link" },
+            "figure": { "$ref": "#/definitions/figure" }
           }
         },
         "x": { "$ref": "#/definitions/brandSlide" },
@@ -70,7 +73,9 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "eyebrow": { "type": "string" },
             "sentence": { "type": "string" },
+            "figure": { "$ref": "#/definitions/figure" },
             "hardware": {
               "type": "array",
               "items": {
@@ -89,7 +94,9 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "eyebrow": { "type": "string" },
             "sentence": { "type": "string" },
+            "figure": { "$ref": "#/definitions/figure" },
             "links": {
               "type": "object",
               "additionalProperties": false,
@@ -106,7 +113,9 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "eyebrow": { "type": "string" },
             "sentence": { "type": "string" },
+            "figure": { "$ref": "#/definitions/figure" },
             "contacts": {
               "type": "array",
               "items": {
@@ -143,9 +152,23 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "eyebrow": { "type": "string" },
         "handle": { "type": "string" },
         "intent": { "type": "string" },
-        "cta": { "$ref": "#/definitions/link" }
+        "cta": { "$ref": "#/definitions/link" },
+        "figure": { "$ref": "#/definitions/figure" }
+      }
+    },
+    "figure": {
+      "type": "object",
+      "description": "右下角的图注：fig = 背景画的是什么；mark / reading / gloss = 汉字、读音、释义（品牌屏只写 gloss）",
+      "additionalProperties": false,
+      "required": ["gloss"],
+      "properties": {
+        "fig": { "type": "string", "description": "背景画的是什么（FIG. 后面那个词）" },
+        "mark": { "type": "string" },
+        "reading": { "type": "string" },
+        "gloss": { "type": "string" }
       }
     },
     "linkList": {

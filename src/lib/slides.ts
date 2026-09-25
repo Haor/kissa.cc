@@ -1,17 +1,20 @@
 import type { ThemeKey } from "./theme";
+import type { MaskId } from "@/assets/masks";
 import site from "@/content/site.json";
 
 /**
  * 一屏卡片的描述。
  *
  * 内容分两层：
- *   - 视觉层：每屏的 effect / theme / cellSize / speed / maskId / cursorIntensity
+ *   - 视觉层：每屏的 effect / theme / speed / figure / text 侧
  *     —— 写在本文件下方的 `SLIDE_VISUALS` 数组里，与文案完全无关。
- *   - 文案层：sentence / handle / intent / cta / contacts / hardware / links
+ *   - 文案层：eyebrow / sentence / handle / intent / cta / figure 注释 / ...
  *     —— 集中在 `src/content/site.json`，普通改动只需要编辑这一个 JSON。
  *
  * 最终对外导出的 `SLIDES` 由两层在模块加载时合并而成。
  */
+
+export type LinkItem = { label: string; href: string; note?: string };
 
 export type Slide = {
   /** URL hash 的稳定 id；同时也是 site.json 里 slides.<id> 的 key */
@@ -20,18 +23,22 @@ export type Slide = {
   label: string;
   /** 主题 key（对应 THEMES） */
   theme: ThemeKey;
-  /** Shader effect id：1 mushroom / 2 wave / 3 orbit / 4 chaos / 5 grid
-   *  6 drift / 7 starfield / 8 circuit / 9 matrix / 10 constellation */
+  /** Shader effect id：1 film / 2 invaders / 3 neural / 4 chaos / 5 grid
+   *  6 drift / 7 thread / 8 circuit / 9 meters / 10 web */
   effect: number;
-  /** 字符密度 cell size（px） */
-  cellSize: number;
   /** 动画速度乘子 */
   speed: number;
-  /** 启用品牌 SVG mask */
-  maskId?: "x" | "instagram" | "github" | "huggingface" | "steam";
-  /** 居中主文（cover/about/hardware/links/contact 用） */
+  /** 字符场里凝聚出的 figure（品牌 logo 或汉字） */
+  figure: MaskId;
+  /** 文案在哪一侧；figure 自动放到另一侧 */
+  text: "left" | "right";
+  /** figure 尺寸倍率（默认 1） */
+  figureScale?: number;
+  /** 小标题（"who" / "rig" ...） */
+  eyebrow?: string;
+  /** 主文 */
   sentence?: string;
-  /** cover 顶部小字（"kicker" 标题） */
+  /** cover 顶部小字 */
   kicker?: string;
   /** 平台 handle / 邮箱 */
   handle?: string;
@@ -39,6 +46,8 @@ export type Slide = {
   intent?: string;
   /** 主 CTA */
   cta?: { label: string; href: string };
+  /** 右下角图注：fig = 背景画的是什么；汉字屏再加 mark / reading */
+  figureNote?: { fig?: string; mark?: string; reading?: string; gloss: string };
   /** contact 屏的多组联系方式。action: "copy" 时点击复制 href 内容 */
   contacts?: {
     label: string;
@@ -50,146 +59,42 @@ export type Slide = {
   hardware?: { group: string; value: string }[];
   /** links 屏的外链分组 */
   links?: {
-    projects: { label: string; href: string; note?: string }[];
-    tools: { label: string; href: string; note?: string }[];
-    friends: { label: string; href: string; note?: string }[];
+    projects: LinkItem[];
+    tools: LinkItem[];
+    friends: LinkItem[];
   };
-  /** 鼠标交互强度（0=完全不动 1=v0 默认） */
-  cursorIntensity: number;
 };
 
 /** 视觉层配置：每屏的 id + label + 渲染参数。普通用户无需修改。 */
 type SlideVisual = Pick<
   Slide,
-  | "id"
-  | "label"
-  | "theme"
-  | "effect"
-  | "cellSize"
-  | "speed"
-  | "maskId"
-  | "cursorIntensity"
+  "id" | "label" | "theme" | "effect" | "speed" | "figure" | "text" | "figureScale"
 >;
 
 const SLIDE_VISUALS: SlideVisual[] = [
-  {
-    id: "cover",
-    label: "Index",
-    theme: "cover",
-    effect: 6,
-    cellSize: 8,
-    speed: 0.18,
-    cursorIntensity: 0.3,
-  },
-  {
-    id: "about",
-    label: "About",
-    theme: "about",
-    effect: 8,
-    cellSize: 9,
-    speed: 0.45,
-    cursorIntensity: 0.8,
-  },
-  {
-    id: "x",
-    label: "X",
-    theme: "x",
-    effect: 4,
-    cellSize: 9,
-    speed: 0.55,
-    maskId: "x",
-    cursorIntensity: 0.6,
-  },
-  {
-    id: "instagram",
-    label: "Instagram",
-    theme: "instagram",
-    effect: 1,
-    cellSize: 9,
-    speed: 0.4,
-    maskId: "instagram",
-    cursorIntensity: 0.6,
-  },
-  {
-    id: "github",
-    label: "GitHub",
-    theme: "github",
-    effect: 5,
-    cellSize: 10,
-    speed: 0.9,
-    maskId: "github",
-    cursorIntensity: 0.5,
-  },
-  {
-    id: "huggingface",
-    label: "Hugging Face",
-    theme: "huggingface",
-    effect: 3,
-    cellSize: 10,
-    speed: 0.6,
-    maskId: "huggingface",
-    cursorIntensity: 0.7,
-  },
-  {
-    id: "steam",
-    label: "Steam",
-    theme: "steam",
-    effect: 2,
-    cellSize: 10,
-    speed: 0.8,
-    maskId: "steam",
-    cursorIntensity: 0.5,
-  },
-  {
-    id: "hardware",
-    label: "Hardware",
-    theme: "hardware",
-    effect: 9,
-    cellSize: 10,
-    speed: 0.65,
-    cursorIntensity: 0.6,
-  },
-  {
-    id: "links",
-    label: "Links",
-    theme: "links",
-    effect: 10,
-    cellSize: 9,
-    speed: 0.55,
-    cursorIntensity: 0.7,
-  },
-  {
-    id: "contact",
-    label: "Contact",
-    theme: "contact",
-    effect: 7,
-    cellSize: 11,
-    speed: 0.3,
-    cursorIntensity: 0.4,
-  },
+  { id: "cover", label: "Index", theme: "cover", effect: 6, speed: 0.22, figure: "dream", text: "left" },
+  { id: "about", label: "About", theme: "about", effect: 8, speed: 0.45, figure: "self", text: "left" },
+  { id: "x", label: "X", theme: "x", effect: 4, speed: 0.55, figure: "x", text: "left" },
+  { id: "instagram", label: "Instagram", theme: "instagram", effect: 1, speed: 1, figure: "instagram", text: "left" },
+  { id: "github", label: "GitHub", theme: "github", effect: 5, speed: 0.9, figure: "github", text: "left" },
+  { id: "huggingface", label: "Hugging Face", theme: "huggingface", effect: 3, speed: 1, figure: "huggingface", text: "left" },
+  { id: "steam", label: "Steam", theme: "steam", effect: 2, speed: 1, figure: "steam", text: "left" },
+  { id: "hardware", label: "Hardware", theme: "hardware", effect: 9, speed: 1, figure: "machine", text: "right" },
+  { id: "links", label: "Links", theme: "links", effect: 10, speed: 1, figure: "web", text: "right", figureScale: 0.72 },
+  { id: "contact", label: "Contact", theme: "contact", effect: 7, speed: 1, figure: "bond", text: "right" },
 ];
 
 /** 文案层：site.json 里 slides.<id> 的所有字段都允许是 optional。 */
-type SlideCopy = Partial<
-  Pick<
-    Slide,
-    | "sentence"
-    | "kicker"
-    | "handle"
-    | "intent"
-    | "cta"
-    | "contacts"
-    | "hardware"
-    | "links"
-  >
->;
+type SlideCopy = Partial<Omit<Slide, keyof SlideVisual>> & {
+  figure?: Slide["figureNote"];
+};
 
 const SLIDE_COPY = site.slides as unknown as Record<string, SlideCopy>;
 
 /** 把视觉配置和 site.json 里的文案合成最终 Slide 列表。 */
 export const SLIDES: Slide[] = SLIDE_VISUALS.map((visual) => {
-  const copy = SLIDE_COPY[visual.id] ?? {};
-  return { ...visual, ...copy };
+  const { figure, ...copy } = SLIDE_COPY[visual.id] ?? {};
+  return { ...visual, ...copy, figureNote: figure };
 });
 
 export const SLIDE_INDEX_BY_ID: Record<string, number> = SLIDES.reduce(

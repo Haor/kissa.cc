@@ -12,12 +12,13 @@
  *   - PNG 源直接 pngjs decode，灰度阈值化
  *   - 运行时只需 fetch + createImageBitmap，浏览器 PNG 解码 100% 一致
  *
- * 渲染参数（保持视觉效果不变）：
- *   - size = 1024×1024
+ * 渲染参数：
+ *   - 在 1024×1024 上光栅化 + 膨胀 + 模糊，最后 2×2 box 降采样到 512×512
+ *     （mask 本身是模糊的密度场，512 足够；体积约为 1024 RGBA 的 1/10）
  *   - padding = 10%（源居中放在 80% 内框）
- *   - boxMax dilation r ≈ size * 0.6%（约 6 px）
+ *   - boxMax dilation r ≈ size * 0.6%（约 6 px），figure 汉字笔画细密，单独调小
  *   - boxBlur r ≈ size * 1.0%（约 10 px）
- *   - 输出像素 = (density, density, density, 255)，alpha 恒 255 消除预乘歧义
+ *   - 输出 8-bit 灰度 PNG（无 alpha 通道，消除预乘歧义）
  *
  * 运行：`npm run gen-masks`
  */
@@ -41,9 +42,15 @@ const PADDING = 0.1;
  *  - svg: 从 src/assets/masks.ts 取字符串，resvg 渲染
  *  - png: 从 scripts/mask-sources/{file} 读 PNG（任意尺寸，白色剪影 + 透明背景）
  */
-type MaskSource =
+type MaskSource = (
   | { kind: "svg" }
-  | { kind: "png"; file: string };
+  | { kind: "png"; file: string }
+) & {
+  /** 膨胀半径（占 SIZE 比例），默认 0.006 */
+  dilate?: number;
+  /** 模糊半径（占 SIZE 比例），默认 0.01 */
+  blur?: number;
+};
 
 const MASK_SOURCES: Record<MaskId, MaskSource> = {
   x: { kind: "svg" },
@@ -51,7 +58,29 @@ const MASK_SOURCES: Record<MaskId, MaskSource> = {
   github: { kind: "svg" },
   huggingface: { kind: "png", file: "huggingface.png" },
   steam: { kind: "svg" },
+  // 汉字 figure：笔画密（機 / 網），膨胀太大会糊成一团
+  dream: { kind: "svg", dilate: 0.003, blur: 0.007 },
+  self: { kind: "svg", dilate: 0.003, blur: 0.007 },
+  machine: { kind: "svg", dilate: 0.0015, blur: 0.006 },
+  web: { kind: "svg", dilate: 0.0015, blur: 0.006 },
+  bond: { kind: "svg", dilate: 0.002, blur: 0.006 },
 };
+
+const OUT_SIZE = SIZE / 2;
+
+/** 2×2 box 降采样 */
+function downsample2(src: Uint8Array, w: number, h: number): Uint8Array {
+  const ow = w >> 1;
+  const oh = h >> 1;
+  const out = new Uint8Array(ow * oh);
+  for (let y = 0; y < oh; y++) {
+    for (let x = 0; x < ow; x++) {
+      const i = y * 2 * w + x * 2;
+      out[y * ow + x] = (src[i] + src[i + 1] + src[i + w] + src[i + w + 1] + 2) >> 2;
+    }
+  }
+  return out;
+}
 
 function boxMax(src: Uint8Array, w: number, h: number, r: number): Uint8Array {
   const tmp = new Uint8Array(w * h);
@@ -182,13 +211,13 @@ async function renderMask(id: MaskId): Promise<void> {
     binary = composeBinary(fitted.pixels, fitted.width, fitted.height);
   }
 
-  const dilateR = Math.max(2, Math.round(SIZE * 0.006));
-  const blurR = Math.max(2, Math.round(SIZE * 0.01));
+  const dilateR = Math.max(1, Math.round(SIZE * (source.dilate ?? 0.006)));
+  const blurR = Math.max(2, Math.round(SIZE * (source.blur ?? 0.01)));
   const dilated = boxMax(binary, SIZE, SIZE, dilateR);
-  const blurred = boxBlur(dilated, SIZE, SIZE, blurR);
+  const blurred = downsample2(boxBlur(dilated, SIZE, SIZE, blurR), SIZE, SIZE);
 
-  const png = new PNG({ width: SIZE, height: SIZE, colorType: 6 });
-  for (let i = 0; i < SIZE * SIZE; i++) {
+  const png = new PNG({ width: OUT_SIZE, height: OUT_SIZE, colorType: 6 });
+  for (let i = 0; i < OUT_SIZE * OUT_SIZE; i++) {
     const v = blurred[i];
     png.data[i * 4] = v;
     png.data[i * 4 + 1] = v;
@@ -196,17 +225,18 @@ async function renderMask(id: MaskId): Promise<void> {
     png.data[i * 4 + 3] = 255;
   }
   const outPath = join(OUT_DIR, `${id}.png`);
-  const buf = PNG.sync.write(png, { colorType: 6 });
+  const buf = PNG.sync.write(png, { colorType: 0, inputColorType: 6, inputHasAlpha: true });
   await writeFile(outPath, buf);
 
+  const n = OUT_SIZE * OUT_SIZE;
   let nonZero = 0;
   let solid = 0;
-  for (let i = 0; i < SIZE * SIZE; i++) {
+  for (let i = 0; i < n; i++) {
     if (blurred[i] > 0) nonZero++;
     if (blurred[i] >= 224) solid++;
   }
-  const nzPct = ((nonZero / (SIZE * SIZE)) * 100).toFixed(1);
-  const solidPct = ((solid / (SIZE * SIZE)) * 100).toFixed(1);
+  const nzPct = ((nonZero / n) * 100).toFixed(1);
+  const solidPct = ((solid / n) * 100).toFixed(1);
   const kind = source.kind.toUpperCase();
   console.log(
     `  ${id.padEnd(12)} [${kind}] → ${outPath.replace(REPO_ROOT + "/", "")}  ` +
