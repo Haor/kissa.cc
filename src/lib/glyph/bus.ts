@@ -38,7 +38,7 @@ export const glyphBus = {
   ripple(x: number, y: number, amp?: number) {
     engine?.ripple(x, y, amp);
   },
-  scrims(rects: (DOMRect | null)[]) {
+  scrims(rects: (DOMRect | null)[][]) {
     engine?.setScrims(rects);
   },
   scrimOn(on: boolean) {

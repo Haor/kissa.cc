@@ -33,6 +33,8 @@ export type SceneDef = {
 
 type Mode = "idle" | "auto" | "gesture" | "return";
 
+type ScrimRect = { left: number; top: number; right: number; bottom: number };
+
 type Uniforms = Record<string, WebGLUniformLocation | null>;
 type Prog = { p: WebGLProgram; u: Uniforms };
 
@@ -103,8 +105,8 @@ export class GlyphEngine {
   ];
   private ripIdx = 0;
   private invaders = new Invaders();
-  /** 每一屏文案块的矩形（uv，x0 y0 x1 y1），Carousel 一次量好全部 */
-  private scrims: number[][] = [];
+  /** 每一屏的阅读区矩形（uv，x0 y0 x1 y1）：[文案块, 图注]，Carousel 一次量好全部 */
+  private scrims: number[][][] = [];
   private scrimAmt = 0;
   private scrimAmtTarget = 0;
 
@@ -267,10 +269,10 @@ export class GlyphEngine {
     this.ripIdx = (this.ripIdx + 1) % this.ripples.length;
   }
 
-  /** 每一屏的阅读区（CSS 像素矩形，下标 = 屏序号；null = 这屏没有） */
-  setScrims(rects: ({ left: number; top: number; right: number; bottom: number } | null)[]) {
+  /** 每一屏的阅读区（CSS 像素矩形；下标 = 屏序号，每屏最多两块，null = 没有） */
+  setScrims(rects: (ScrimRect | null)[][]) {
     const r = this.canvas.getBoundingClientRect();
-    this.scrims = rects.map((rc) =>
+    const toUv = (rc: ScrimRect | null) =>
       rc
         ? [
             (rc.left - r.left) / r.width,
@@ -278,8 +280,8 @@ export class GlyphEngine {
             (rc.right - r.left) / r.width,
             1 - (rc.top - r.top) / r.height,
           ]
-        : [0, 0, 0, 0],
-    );
+        : [0, 0, 0, 0];
+    this.scrims = rects.map((pair) => [toUv(pair[0] ?? null), toUv(pair[1] ?? null)]);
   }
 
   /** 整体开关（目录打开时关掉，figure 会让到右侧） */
@@ -341,7 +343,7 @@ export class GlyphEngine {
         "u_res", "u_cellPx", "u_time", "u_aspect",
         "u_effA", "u_effB", "u_speedA", "u_speedB", "u_maskA", "u_maskB", "u_placeA", "u_placeB",
         "u_progress", "u_wipeDir", "u_wipeRadial", "u_wipeOrigin", "u_turbAmt",
-        "u_masks", "u_energy", "u_mouse", "u_mouseActive", "u_rip", "u_scrimA", "u_scrimB", "u_scrimAmt", "u_drag",
+        "u_masks", "u_energy", "u_mouse", "u_mouseActive", "u_rip", "u_scrimA", "u_scrimB", "u_scrimA2", "u_scrimB2", "u_scrimAmt", "u_drag",
         "u_inv", "u_invGap", "u_invKill", "u_invBoom", "u_ship", "u_shots",
       ]),
       blur: this.program(BLUR_FRAG, ["u_src", "u_grid", "u_step", "u_first"]),
@@ -633,8 +635,10 @@ export class GlyphEngine {
     gl.uniform1f(fu.u_mouseActive, m.act);
     gl.uniform4fv(fu.u_rip, this.ripples.flat());
     const none = [0, 0, 0, 0];
-    gl.uniform4fv(fu.u_scrimA, this.scrims[a] ?? none);
-    gl.uniform4fv(fu.u_scrimB, this.scrims[b] ?? none);
+    gl.uniform4fv(fu.u_scrimA, this.scrims[a]?.[0] ?? none);
+    gl.uniform4fv(fu.u_scrimB, this.scrims[b]?.[0] ?? none);
+    gl.uniform4fv(fu.u_scrimA2, this.scrims[a]?.[1] ?? none);
+    gl.uniform4fv(fu.u_scrimB2, this.scrims[b]?.[1] ?? none);
     gl.uniform1f(fu.u_scrimAmt, this.scrimAmt);
     gl.uniform1f(fu.u_drag, this.dragSm);
     const inv = this.invaders;

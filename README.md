@@ -63,7 +63,7 @@ npx tsc --noEmit # 类型检查（无 lint / 无测试套件）
 每屏的背景动效都取自这个主题「自己的东西」—— 就像 GitHub 屏画的就是贡献图：
 
 ```
-00 cover         drift      云雾里浮着往上漂的泡泡          夢 yume — dream
+00 cover         drift      泡沫质感的云团（° o O 实心填充）  夢 yume — dream
 01 about         circuit    走线汇向「私」，外侧散成飘点    私 watashi — i, myself
 02 x             timeline   几列时间线往下刷，新帖在打字    X mark
 03 instagram     film       胶片穿过镜头：快门、推进、显影  camera mark

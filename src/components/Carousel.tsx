@@ -221,12 +221,20 @@ export function Carousel() {
     const measure = () => {
       const root = rootRef.current;
       if (!root) return;
+      const rectOf = (el: HTMLElement | null, pad: number) => {
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        // display:none（手机上隐藏的图注）量出来是 0
+        if (!r.width || !r.height) return null;
+        return new DOMRect(r.left - pad, r.top - pad, r.width + pad * 2, r.height + pad * 2);
+      };
       glyphBus.scrims(
         SLIDES.map((s) => {
-          const el = root.querySelector<HTMLElement>(`[data-slide="${s.id}"] [data-scrim]`);
-          if (!el) return null;
-          const r = el.getBoundingClientRect();
-          return new DOMRect(r.left - 24, r.top - 24, r.width + 48, r.height + 48);
+          const slide = root.querySelector<HTMLElement>(`[data-slide="${s.id}"]`);
+          return [
+            rectOf(slide?.querySelector<HTMLElement>("[data-scrim]") ?? null, 24),
+            rectOf(slide?.querySelector<HTMLElement>("figure") ?? null, 14),
+          ];
         }),
       );
     };
