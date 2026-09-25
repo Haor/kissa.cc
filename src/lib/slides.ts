@@ -34,6 +34,8 @@ export type Slide = {
   text: "left" | "right";
   /** figure 尺寸倍率（默认 1） */
   figureScale?: number;
+  /** 竖屏 figure 摆位覆盖（中心高度 + 占屏宽比例 + 上限），见 GlyphEngine.place */
+  figurePortrait?: { y: number; w: number; max: number };
   /** 小标题（"who" / "rig" ...） */
   eyebrow?: string;
   /** 主文 */
@@ -68,7 +70,7 @@ export type Slide = {
 /** 视觉层配置：每屏的 id + label + 渲染参数。普通用户无需修改。 */
 type SlideVisual = Pick<
   Slide,
-  "id" | "label" | "theme" | "effect" | "speed" | "figure" | "text" | "figureScale"
+  "id" | "label" | "theme" | "effect" | "speed" | "figure" | "text" | "figureScale" | "figurePortrait"
 >;
 
 const SLIDE_VISUALS: SlideVisual[] = [
@@ -78,7 +80,11 @@ const SLIDE_VISUALS: SlideVisual[] = [
   { id: "instagram", label: "Instagram", theme: "instagram", effect: 1, speed: 1, figure: "instagram", text: "left" },
   { id: "github", label: "GitHub", theme: "github", effect: 5, speed: 0.9, figure: "github", text: "left" },
   { id: "huggingface", label: "Hugging Face", theme: "huggingface", effect: 3, speed: 1, figure: "huggingface", text: "left" },
-  { id: "steam", label: "Steam", theme: "steam", effect: 2, speed: 1, figure: "steam", text: "left" },
+  {
+    id: "steam", label: "Steam", theme: "steam", effect: 2, speed: 1, figure: "steam", text: "left",
+    // 竖屏：图标缩小下移，上方让给侵略者编队，图标自己当炮台
+    figurePortrait: { y: 0.555, w: 0.56, max: 0.28 },
+  },
   { id: "hardware", label: "Hardware", theme: "hardware", effect: 9, speed: 1, figure: "machine", text: "right" },
   { id: "links", label: "Links", theme: "links", effect: 10, speed: 1, figure: "web", text: "right", figureScale: 0.72 },
   { id: "contact", label: "Contact", theme: "contact", effect: 7, speed: 1, figure: "bond", text: "right" },

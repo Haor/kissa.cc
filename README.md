@@ -68,8 +68,8 @@ npx tsc --noEmit # 类型检查（无 lint / 无测试套件）
 02 x             timeline   几列时间线往下刷，新帖在打字    X mark
 03 instagram     film       胶片穿过镜头：快门、推进、显影  camera mark
 04 github        grid       贡献图方块                    octocat mark
-05 huggingface   neural     6 层网络前向传播，输出接 🤗     🤗 mark
-06 steam         invaders   太空侵略者，飞船跟着光标开火    steam mark
+05 huggingface   neural     满屏曲线收拢穿过 🤗（透镜）     🤗 mark
+06 steam         invaders   太空侵略者；竖屏由图标当炮台    steam mark
 07 hardware      meters     16 核负载柱 + 峰值保持          機 ki — machine
 08 links         web        蛛网：放射丝 + 螺旋丝 + 露珠      網 ami — net, web
 09 contact       thread     赤い糸：两段红线差一点接上      縁 en — a bond, fated

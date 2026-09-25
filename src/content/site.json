@@ -77,7 +77,7 @@
         { "group": "BOARD", "value": "ASUS ROG STRIX X870-A Gaming WiFi" },
         { "group": "VR-HMD", "value": "Meta Quest Pro · Quest 3" },
         { "group": "VR-INPUT", "value": "Valve Index Knuckles" },
-        { "group": "VR-TRACK", "value": "HTC Vive Tracker 3.0 ×9" },
+        { "group": "VR-TRACK", "value": "HTC Vive Tracker 3.0 × 9" },
         { "group": "FACE-TRACK", "value": "Paper Tracker" }
       ]
     },

@@ -23,6 +23,8 @@ export type SceneDef = {
   text: "left" | "right";
   /** figure 尺寸倍率（默认 1）：背景本身是主角的屏把 figure 缩小一点 */
   figScale?: number;
+  /** 竖屏摆位覆盖：中心高度（uv，0 = 底）、尺寸 = min(屏宽 × w, max) */
+  portrait?: { y: number; w: number; max: number };
   ink: RGB;
   glyph: RGB;
   glow: RGB;
@@ -344,7 +346,7 @@ export class GlyphEngine {
         "u_effA", "u_effB", "u_speedA", "u_speedB", "u_maskA", "u_maskB", "u_placeA", "u_placeB",
         "u_progress", "u_wipeDir", "u_wipeRadial", "u_wipeOrigin", "u_turbAmt",
         "u_masks", "u_energy", "u_mouse", "u_mouseActive", "u_rip", "u_scrimA", "u_scrimB", "u_scrimA2", "u_scrimB2", "u_scrimAmt", "u_drag",
-        "u_inv", "u_invGap", "u_invKill", "u_invBoom", "u_ship", "u_shots",
+        "u_inv", "u_invGap", "u_invKill", "u_invBoom", "u_ship", "u_shots", "u_muzzle",
       ]),
       blur: this.program(BLUR_FRAG, ["u_src", "u_grid", "u_step", "u_first"]),
       compose: this.program(COMPOSE_FRAG, [
@@ -501,6 +503,8 @@ export class GlyphEngine {
     const aspect = this.canvas.width / this.canvas.height;
     if (aspect < 0.95) {
       // 竖屏：figure 在上半部，文案压在下方；文案多的屏（列表类）figure 再往上收
+      const o = s?.portrait;
+      if (o) return [0.5, o.y, Math.min(o.w * aspect, o.max)];
       return s?.text === "right"
         ? [0.5, 0.815, Math.min(0.6 * aspect, 0.3)]
         : [0.5, 0.67, Math.min(0.92 * aspect, 0.5)];
@@ -643,17 +647,24 @@ export class GlyphEngine {
     gl.uniform1f(fu.u_drag, this.dragSm);
     const inv = this.invaders;
     if (sa?.effect === EFFECT_INVADERS || sb?.effect === EFFECT_INVADERS) {
-      inv.layout(this.gridW, this.gridH);
+      // 竖屏没地方放飞船：Steam 图标当炮台
+      const si = sa?.effect === EFFECT_INVADERS ? this.a : this.b;
+      const [px, py, size] = this.place(si);
+      const turret = this.canvas.width < this.canvas.height * 0.95
+        ? { x: Math.round(px * this.gridW), y: Math.round(py * this.gridH), r: Math.round(size * 0.5 * this.gridH) }
+        : null;
+      inv.layout(this.gridW, this.gridH, turret);
       inv.update(dt, m.x, m.act > 0.5);
     }
     gl.uniform4f(fu.u_inv, inv.x, inv.yTop, inv.frame, inv.cols);
-    gl.uniform2f(fu.u_invGap, inv.gapX, inv.gapY);
+    gl.uniform3f(fu.u_invGap, inv.gapX, inv.gapY, inv.rows);
     gl.uniform1i(fu.u_invKill, inv.kill);
     gl.uniform4f(fu.u_invBoom, inv.boom.col, inv.boom.row, inv.boom.age, inv.boom.age < 0.4 ? 1 : 0);
     gl.uniform2f(fu.u_ship, Math.round(inv.shipX), inv.shipY);
     const shots = new Float32Array(16);
-    inv.shots.slice(0, 4).forEach((sh, i) => shots.set([sh.x, Math.floor(sh.y), 1, 0], i * 4));
+    inv.shots.slice(0, 4).forEach((sh, i) => shots.set([sh.x, sh.y, sh.dx, sh.dy], i * 4));
     gl.uniform4fv(fu.u_shots, shots);
+    gl.uniform3f(fu.u_muzzle, inv.muzzle.x, inv.muzzle.y, inv.muzzle.age);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
     // ---- 3. blur ----

@@ -131,6 +131,8 @@ ${COMMON}
 // ---- effect 公共上下文（sampleScene 在调用 scene 前写入）----
 vec2  g_suv;    // 屏幕 uv（已含转场 / 尾迹位移）
 vec2  g_place;  // 当前 scene 的 figure 中心
+float g_size;   // 当前 scene 的 figure 边长（视口高度单位）
+float g_mask;   // 当前 cell 的 figure mask 值（0..1）
 vec2  g_grid;   // 字符格行列数
 float g_acc;    // effect 自定义：用描边色画（0..1）
 float g_fill;   // effect 自定义：字符格底色块（0..1）
@@ -238,11 +240,12 @@ const int SHIP[8] = int[8](0x40, 0xE0, 0xE0, 0xFFE, 0x1FFF, 0x1FFF, 0x1FFF, 0x1F
 const int BOOM[8] = int[8](0x451, 0x252, 0x104, 0x603, 0x104, 0x252, 0x451, 0x0);
 
 uniform vec4  u_inv;       // 编队左缘 x、距顶 y、动画帧、列数
-uniform vec2  u_invGap;    // 列距、行距
+uniform vec3  u_invGap;    // 列距、行距、行数
 uniform int   u_invKill;   // 已击落位掩码（bit = row * 8 + col）
 uniform vec4  u_invBoom;   // 爆炸 col、row、已过秒数、是否有效
-uniform vec2  u_ship;      // 飞船左下角
-uniform vec4  u_shots[4];  // 子弹 x、y、是否存活
+uniform vec2  u_ship;      // 飞船左下角（竖屏没有飞船，y 给到屏幕外）
+uniform vec4  u_shots[4];  // 子弹：弹头 x、y + 飞行方向；方向为 0 = 空槽
+uniform vec3  u_muzzle;    // 竖屏炮口（Steam 图标圆边上）x、y、距开火的秒数
 
 float bitAt(int bits, int x, int w) {
   if (x < 0 || x >= w) return 0.0;
@@ -268,7 +271,7 @@ float effectInvaders(float t) {
   if (lx >= 0.0 && ly >= 0.0) {
     int col = int(lx / u_invGap.x);
     int row = int(ly / u_invGap.y);
-    if (col < int(u_inv.w) && row < 4) {
+    if (col < int(u_inv.w) && row < int(u_invGap.z)) {
       int px = int(lx) - col * int(u_invGap.x);
       int py = int(ly) - row * int(u_invGap.y);
       if (py < 8) {
@@ -293,83 +296,128 @@ float effectInvaders(float t) {
     g_acc = max(g_acc, b);
     g_fill = max(g_fill, b * 0.3);
   }
+  // 子弹：从弹头往回拖三格的一道
   for (int i = 0; i < 4; i++) {
     vec4 s = u_shots[i];
-    if (s.z > 0.5 && c.x == s.x && c.y >= s.y && c.y < s.y + 3.0) {
+    if (dot(s.zw, s.zw) < 0.5) continue;
+    vec2 pc = c + 0.5 - s.xy;
+    float back = -dot(pc, s.zw);
+    float perp = abs(pc.x * s.w - pc.y * s.z);
+    if (back > -0.5 && back < 2.6 && perp < 0.55) {
       v = 1.0;
       g_acc = 1.0;
     }
+  }
+  // 炮口闪光：开火那一下图标圆边上亮一小团
+  float fl = exp(-u_muzzle.z * 12.0);
+  float fr = length(c + 0.5 - u_muzzle.xy);
+  if (fl > 0.02 && fr < 3.0) {
+    float b = fl * (1.0 - fr / 3.0);
+    v = max(v, b);
+    g_acc = max(g_acc, b);
   }
   return v;
 }
 
 // ===========================================================================
 // 3 · NEURAL —— Hugging Face「models i tinker with.」
-// 6 层全连接网络画在左上方，最后一层的输出正对 🤗。每个节点只占一格（○ 待命 / ● 激活），
-// 全连接的边统一用最淡的 ·，只有前向传播中的脉冲用描边色 —— 结构安静，信号醒目。
+// 一束穿过 🤗 的「透镜」：一族互不相交的曲线从左缘（竖屏是底边）铺满整个高度出发，
+// 缓缓收拢，汇进笑脸，再从另一侧稍稍散开流到屏幕边缘 —— 笑脸就是网络中间的模型。
+// 上游 5 列「层」上的节点 + 笑脸圆边 = six layers。线上一直有小段的光往里淌；
+// 每 3.6 秒一道前向传播的波前从左推到右：扫过节点（○ → ●），穿过笑脸时笑脸整体
+// 亮一下，出来以后只有一条线留着亮 —— 这一轮的「猜测」（one guess）。
+// 曲线在笑脸圆内截断，五官的空隙里不画线。
 // ===========================================================================
-const int NN[6] = int[6](3, 5, 6, 6, 4, 2);
-const float NN_X0 = 0.06;
-const float NN_X1 = 0.58;
+float nnXL; float nnXR; float nnR; float nnGIn; float nnGOut;
 
-vec2 nodeCell(int i, int j) {
-  float n = float(NN[i]);
-  float sp = min(0.085, 0.46 / max(n - 1.0, 1.0));
-  vec2 p = vec2(mix(NN_X0, NN_X1, float(i) / 5.0), 0.68 + (float(j) - (n - 1.0) * 0.5) * sp);
-  return floor(p * g_grid) + 0.5;
+// 曲线族的横向缩放：上游 1 → 笑脸处 nnGIn → 下游 nnGOut
+float nnSpread(float x) {
+  if (x < 0.0) return mix(1.0, nnGIn, smoothstep(nnXL * 0.6, -nnR * 0.3, x));
+  return mix(nnGIn, nnGOut, smoothstep(nnR * 0.35, nnXR, x));
 }
 
 float effectNeural(float t) {
-  vec2 c = floor(g_suv * g_grid) + 0.5;
-  float x0 = NN_X0 * g_grid.x;
-  float x1 = NN_X1 * g_grid.x;
-  if (c.x < x0 - 1.0 || c.x > x1 + 1.0) return 0.0;
-  const float P = 3.4;
+  vec2 asp = vec2(u_aspect, 1.0);
+  bool portrait = u_aspect < 0.95;
+  // 流向 ax、横向 pe（竖屏自下而上）
+  vec2 ax = portrait ? vec2(0.0, 1.0) : vec2(1.0, 0.0);
+  vec2 pe = portrait ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+  vec2 F = g_place * asp;
+  nnR = g_size * 0.36;
+  vec2 dd = g_suv * asp - F;
+  float X = dot(dd, ax);
+  float Y = dot(dd, pe);
+  float r = length(dd);
+  float cs = 1.0 / g_grid.y;                         // 一格的边长（视口高度单位）
+  float H = portrait ? 0.5 * u_aspect : 0.5;         // 横向半宽
+  nnXL = portrait ? -F.y : -F.x;
+  nnXR = (portrait ? 1.0 : u_aspect) + nnXL;
+  float sp = portrait ? 0.062 * u_aspect * 2.0 : 0.072;   // 上游的线距
+  nnGIn = nnR * 0.9 / (H + 0.1);
+  nnGOut = portrait ? 0.9 : 0.62;
+
+  // 这一格落在哪条线上：把 Y 按缩放还原到上游，取最近的一条
+  float g = nnSpread(X);
+  float y0 = Y / g;
+  float k = floor(y0 / sp + 0.5);
+  float slope = k * sp * (nnSpread(X + 0.01) - nnSpread(X - 0.01)) / 0.02;
+  float dist = abs(y0 - k * sp) * g / sqrt(1.0 + slope * slope);
+
+  // ---- 前向传播的波前：从左缘推到右缘，u ≈ 0.62 时穿过笑脸 ----
+  const float P = 3.6;
   float pass = floor(t / P);
-  float phi = fract(t / P) * 7.0 - 0.5;   // 传播前沿（以层为单位）
-  int gi = int(clamp(floor((c.x - x0) / ((x1 - x0) / 5.0)), 0.0, 4.0));
+  float u = fract(t / P);
+  float front = mix(nnXL - 0.05, nnXR + 0.1, u / 0.92);
+  float fu = (0.0 - (nnXL - 0.05)) / (nnXR + 0.15 - nnXL) * 0.92;   // 波前到笑脸中心的时刻
+
   float v = 0.0;
+  float hit = smoothstep(fu - 0.08, fu, u) * exp(-max(u - fu, 0.0) * 5.0);
+  float face = smoothstep(0.25, 0.6, g_mask);
+  v = max(v, hit * face);
+  g_acc = max(g_acc, hit * face * 0.9);
+  if (r < nnR * 0.97) return v;
+  // 只要上游落在屏幕内的那些线（屏幕外的会被收拢挤进笑脸上下）
+  if (dist > 0.5 * cs || abs(k) * sp > H - 0.02) return v;
 
-  for (int j = 0; j < 6; j++) {
-    if (j >= NN[gi]) break;
-    vec2 a = nodeCell(gi, j);
-    float sa = hash(vec2(float(gi * 17 + j), pass));
-    for (int k = 0; k < 6; k++) {
-      if (k >= NN[gi + 1]) break;
-      vec2 b = nodeCell(gi + 1, k);
-      vec2 ba = b - a;
-      vec2 pa = c - a;
-      float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-      if (length(pa - ba * h) > 0.5) continue;
-      v = max(v, 0.33);
-      // 脉冲：只走激活强的源节点、权重大的边
-      float q = phi - float(gi);
-      float w = hash(vec2(float(gi * 131 + j * 13 + k), 7.7));
-      if (q > 0.0 && q < 1.0 && sa > 0.45 && w > 0.5) {
-        float d = (h - q) * length(ba);
-        if (d < 0.6 && d > -2.6) {
-          v = max(v, d > -0.6 ? 0.56 : 0.34);
-          g_acc = max(g_acc, d > -0.6 ? 1.0 : 0.6);
-        }
-      }
-    }
+  vec2 md = (u_mouse - g_suv) * asp;
+  float near = exp(-dot(md, md) * 60.0) * u_mouseActive;
+  float kh = hash(vec2(k, 1.7));
+
+  // ---- 线 + 一直往里淌的小段光 ----
+  float line = 0.38 + 0.25 * near;
+  float dash = fract(X * 7.0 - t * (0.35 + 0.25 * kh) + kh * 3.0);
+  if (dash < 0.1) {
+    line = max(line, dash < 0.05 ? 0.6 : 0.48);
+    g_acc = max(g_acc, dash < 0.05 ? 0.7 : 0.2);
   }
+  float wf = front - X;
+  if (wf > 0.0 && wf < 0.12 && u < 0.95) {
+    line = max(line, wf < 0.03 ? 0.62 : 0.46);
+    g_acc = max(g_acc, wf < 0.03 ? 1.0 : 0.6);
+  }
+  // 下游：波前过去以后只剩一条线亮着
+  float guess = floor((hash(vec2(pass, 3.3)) - 0.5) * H * 0.9 / sp + 0.5);
+  if (X > 0.0 && k == guess && wf > 0.0) {
+    line = max(line, 0.5);
+    g_acc = max(g_acc, 0.8);
+  }
+  v = max(v, line);
 
-  for (int li = 0; li < 2; li++) {
-    int i = gi + li;
-    for (int j = 0; j < 6; j++) {
-      if (j >= NN[i]) break;
-      vec2 nc = nodeCell(i, j);
-      if (any(greaterThan(abs(c - nc), vec2(0.1)))) continue;
-      float act = smoothstep(-0.05, 0.15, phi - float(i)) * exp(-max(phi - float(i) - 0.3, 0.0) * 1.1);
-      vec2 md = (u_mouse - nc / g_grid) * vec2(u_aspect, 1.0);
-      act = max(act, exp(-dot(md, md) * 120.0) * u_mouseActive);
-      float s = hash(vec2(float(i * 17 + j), pass));
-      if (i == 5) s = s > hash(vec2(float(i * 17 + 1 - j), pass)) ? 1.0 : 0.25; // 输出层：赢的那个
-      float lit = act * s;
-      v = 0.72 + 0.28 * smoothstep(0.25, 0.7, lit);
-      g_acc = max(g_acc, smoothstep(0.45, 0.8, lit));
-    }
+  // ---- 层：上游 5 列节点 + 笑脸圆边（第 6 层） ----
+  bool node = false;
+  float li = 0.0;
+  for (int i = 0; i < 5; i++) {
+    float xi = mix(nnXL + 0.035, -nnR - 0.06, float(i) / 4.0);
+    xi = (floor(xi / cs) + 0.5) * cs;
+    if (abs(X - xi) < 0.5 * cs) { node = true; li = float(i); }
+  }
+  if (X < 0.0 && r < nnR * 0.97 + cs) { node = true; li = 5.0; }
+  if (node) {
+    float act = smoothstep(-0.01, 0.01, wf) * exp(-max(wf, 0.0) * 4.0);
+    act *= step(0.3, hash(vec2(k * 7.0 + li, pass)));
+    act = max(act, near);
+    v = 0.72 + 0.28 * smoothstep(0.2, 0.6, act);
+    g_acc = max(g_acc, smoothstep(0.35, 0.8, act));
   }
   return v;
 }
@@ -768,16 +816,7 @@ float outsideAtten(int eff) {
 vec4 sampleScene(int eff, float speed, float maskLayer, vec3 place, vec2 uv) {
   if (eff == 0) return vec4(0.0);
   float t = u_time * speed + 8.0;
-  // v1 的几个 effect 以 figure 中心为原点（保持 0..1 坐标手感）；新 effect 读 g_* 上下文
-  vec2 euv = uv - place.xy + 0.5;
-  g_suv = uv;
-  g_place = place.xy;
-  g_grid = u_res / u_cellPx;
-  g_acc = 0.0;
-  g_fill = 0.0;
-  g_alt = 0.0;
-  float lum = scene(eff, euv, t);
-
+  // mask 先算出来：effect 可以读 g_mask 和 figure 本身联动（比如只让 🤗 的字符闪）
   float m = 0.0;
   if (maskLayer >= 0.0) {
     vec2 q = (uv - place.xy) * vec2(u_aspect, 1.0) / place.z + 0.5;
@@ -785,6 +824,17 @@ vec4 sampleScene(int eff, float speed, float maskLayer, vec3 place, vec2 uv) {
       m = texture(u_masks, vec3(q.x, 1.0 - q.y, maskLayer)).r;
     }
   }
+  // v1 的几个 effect 以 figure 中心为原点（保持 0..1 坐标手感）；新 effect 读 g_* 上下文
+  vec2 euv = uv - place.xy + 0.5;
+  g_suv = uv;
+  g_place = place.xy;
+  g_size = place.z;
+  g_grid = u_res / u_cellPx;
+  g_mask = m;
+  g_acc = 0.0;
+  g_fill = 0.0;
+  g_alt = 0.0;
+  float lum = scene(eff, euv, t);
 
   bool isGrid = eff == 5;
   float floorV = isGrid ? 0.72 : 0.78;
@@ -805,6 +855,13 @@ vec4 sampleScene(int eff, float speed, float maskLayer, vec3 place, vec2 uv) {
   // 最亮的一撮字符用描边色，让画面有「热点」；effect 也可以自己指定（g_acc）
   float accent = max(smoothstep(0.9, 1.0, lum) * (1.0 - m * 0.6) * 0.8, g_acc);
   return vec4(lit, m, fill, accent);
+}
+
+// 稀疏的线稿类背景（蛛网 / 侵略者 / 神经网络）压太狠会整块消失，单独调轻
+float scrimStrength(int eff) {
+  if (eff == 10) return 0.4;
+  if (eff == 2 || eff == 3) return 0.5;
+  return 0.78;
 }
 
 float scrimMask(vec4 r, vec2 uv, vec2 asp) {
@@ -900,10 +957,8 @@ void main() {
   // A / B 两屏各有一块，按这个 cell 的 wipe 进度 s 取用：暗区跟着转场前沿一格格换位，
   // 而不是整块矩形从左边滑到右边。
   if (u_scrimAmt > 0.0) {
-    float kA = max(scrimMask(u_scrimA, uv, asp), scrimMask(u_scrimA2, uv, asp) * 0.85)
-             * (u_effA == 10 ? 0.4 : (u_effA == 2 ? 0.5 : 0.78));
-    float kB = max(scrimMask(u_scrimB, uv, asp), scrimMask(u_scrimB2, uv, asp) * 0.85)
-             * (u_effB == 10 ? 0.4 : (u_effB == 2 ? 0.5 : 0.78));
+    float kA = max(scrimMask(u_scrimA, uv, asp), scrimMask(u_scrimA2, uv, asp) * 0.85) * scrimStrength(u_effA);
+    float kB = max(scrimMask(u_scrimB, uv, asp), scrimMask(u_scrimB2, uv, asp) * 0.85) * scrimStrength(u_effB);
     float k = mix(kA, kB, s) * u_scrimAmt;
     lit *= 1.0 - k;
     heat *= 1.0 - k * 0.64;

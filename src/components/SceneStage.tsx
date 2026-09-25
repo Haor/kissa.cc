@@ -28,6 +28,7 @@ const SCENES: SceneDef[] = SLIDES.map((s) => {
     mask: FIGURES.indexOf(s.figure),
     text: s.text,
     figScale: s.figureScale,
+    portrait: s.figurePortrait,
     ink: hexToRgb(th.ink),
     glyph: hexToRgb(th.glyph),
     glow: hexToRgb(th.glow),
